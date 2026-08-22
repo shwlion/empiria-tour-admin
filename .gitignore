@@ -24,3 +24,6 @@ yarn-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Sandbox cannot delete; retired files land here.
+_to_delete/

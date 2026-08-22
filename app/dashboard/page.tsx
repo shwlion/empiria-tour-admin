@@ -1,106 +1,182 @@
-import {
-  DollarSign,
-  Wallet,
-  ShoppingBag,
-  Ticket,
-  Users,
-  MapPinned,
-  Percent,
-  HandCoins,
-} from 'lucide-react';
-import KpiCard from '@/components/KpiCard';
-import RevenueOverview from '@/components/RevenueOverview';
-import { formatCurrency } from '@/lib/utils';
-import { KPIS, CURRENCY, RECENT_ORDERS, RECENT_TOURS } from '@/lib/sample';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { CalendarRange, MapPinned, Settings, TriangleAlert } from 'lucide-react';
+import { Banner, Button, Card, PageHeader } from '@/components/ui';
+import { formatDepartureDate } from '@/lib/money';
+import { requireStaff } from '@/lib/auth';
+import { listPackages } from '@/lib/admin/packages';
+import { listUpcomingDepartures } from '@/lib/admin/departures';
+import { getSettings, settingsGaps } from '@/lib/admin/settings';
 
-const orderStatusStyles: Record<string, string> = {
-  completed: 'bg-emerald-100 text-emerald-700',
-  refunded: 'bg-red-100 text-red-600',
-  pending: 'bg-amber-100 text-amber-700',
-};
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = { title: 'Overview · Empiria Tour Admin' };
 
-const tourStatusStyles: Record<string, string> = {
-  published: 'bg-emerald-100 text-emerald-700',
-  draft: 'bg-black/10 text-foreground/60',
-};
+/**
+ * The overview.
+ *
+ * Deliberately not a revenue dashboard yet. The scaffold shipped one built on
+ * eighty-six lines of invented numbers, which looks like insight and is not —
+ * and the real figures need B5, which does not exist. What is here instead is
+ * the state of the catalogue and the list of things standing between it and
+ * being sellable, which is the question actually worth answering today.
+ */
+export default async function OverviewPage() {
+  const user = await requireStaff();
+  const scope = user.can.scopedToOwnPackages ? user.id : null;
 
-export default function DashboardPage() {
+  const [packages, departures, settings] = await Promise.all([
+    listPackages(scope),
+    listUpcomingDepartures(scope, 8),
+    getSettings(),
+  ]);
+
+  const live = packages.filter((p) => p.status === 'published');
+  const drafts = packages.filter((p) => p.status === 'draft');
+  const withoutDepartures = packages.filter((p) => p.departureCount === 0 && p.status === 'published');
+  const gaps = user.can.manageSettings ? settingsGaps(settings) : [];
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Platform Overview</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Revenue, orders, tours, and users across Empiria Tour.
+    <>
+      <PageHeader
+        title={`Good to see you${user.name ? `, ${user.name.split(' ')[0]}` : ''}`}
+        description="What is on sale, what is going out, and what is still in the way."
+      />
+
+      {gaps.length > 0 && (
+        <Banner tone="error">
+          <p className="font-medium">
+            The public site is missing {gaps.length} {gaps.length === 1 ? 'setting' : 'settings'} it
+            needs before it can honestly take money.
+          </p>
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+            {gaps.map((g) => (
+              <li key={g}>{g}</li>
+            ))}
+          </ul>
+          <Link href="/dashboard/settings" className="mt-2 inline-block font-medium underline">
+            Fix them in settings
+          </Link>
+        </Banner>
+      )}
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        <Stat label="Live tours" value={live.length} href="/dashboard/tours" icon={MapPinned} />
+        <Stat label="In draft" value={drafts.length} href="/dashboard/tours" icon={MapPinned} />
+        <Stat
+          label="Upcoming departures"
+          value={departures.length}
+          href="/dashboard/departures"
+          icon={CalendarRange}
+        />
+      </div>
+
+      {withoutDepartures.length > 0 && (
+        <Card className="mb-5" title="Published with nothing to book">
+          <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">
+            These are live on the site but have no departures, so a traveller can read about them and
+            then hit a dead end.
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {withoutDepartures.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 text-[13px]">
+                <TriangleAlert size={14} className="shrink-0 text-destructive" aria-hidden="true" />
+                <Link
+                  href={`/dashboard/tours/${p.id}/departures`}
+                  className="text-foreground transition-colors hover:text-primary"
+                >
+                  {p.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card title="Next out the door">
+          {departures.length === 0 ? (
+            <p className="text-[13px] text-muted-foreground">Nothing scheduled yet.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {departures.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/dashboard/tours/${d.packageId}/departures`}
+                      className="block truncate text-[13px] font-medium text-foreground transition-colors hover:text-primary"
+                    >
+                      {d.packageTitle}
+                    </Link>
+                    <span className="text-[12px] text-muted-foreground">
+                      {formatDepartureDate(d.startsOn)}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                    {d.seatsBooked}/{d.capacity} sold
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Recently edited">
+          {packages.length === 0 ? (
+            <div className="text-[13px] text-muted-foreground">
+              <p>No tours yet. Everything on the public site is placeholder content.</p>
+              <Link href="/dashboard/tours/new" className="mt-3 inline-block">
+                <Button>Create the first tour</Button>
+              </Link>
+            </div>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {packages.slice(0, 8).map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-4 py-2.5">
+                  <Link
+                    href={`/dashboard/tours/${p.id}`}
+                    className="min-w-0 truncate text-[13px] font-medium text-foreground transition-colors hover:text-primary"
+                  >
+                    {p.title}
+                  </Link>
+                  <span className="shrink-0 text-[12px] capitalize text-muted-foreground">{p.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {user.can.manageSettings && gaps.length === 0 && (
+        <p className="mt-6 flex items-center gap-2 text-[13px] text-muted-foreground">
+          <Settings size={14} aria-hidden="true" />
+          Platform settings are complete.
         </p>
+      )}
+    </>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  href,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  href: string;
+  icon: typeof MapPinned;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary"
+    >
+      <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
+        <Icon size={14} aria-hidden="true" />
+        {label}
       </div>
-
-      {/* KPI grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title="Total Revenue" value={formatCurrency(KPIS.totalRevenue, CURRENCY)} subtitle="Gross bookings" icon={DollarSign} trend={{ value: '8.2%', positive: true }} />
-        <KpiCard title="Net Platform Revenue" value={formatCurrency(KPIS.netPlatformRevenue, CURRENCY)} subtitle="After payouts" icon={Wallet} trend={{ value: '5.1%', positive: true }} />
-        <KpiCard title="Total Orders" value={KPIS.totalOrders.toLocaleString()} subtitle="Completed payments" icon={ShoppingBag} trend={{ value: '3.4%', positive: true }} />
-        <KpiCard title="Tickets Sold" value={KPIS.ticketsSold.toLocaleString()} subtitle="All tours" icon={Ticket} trend={{ value: '6.9%', positive: true }} />
-        <KpiCard title="Total Users" value={KPIS.totalUsers.toLocaleString()} subtitle="Registered accounts" icon={Users} trend={{ value: '2.2%', positive: true }} />
-        <KpiCard title="Active Tours" value={KPIS.totalTours.toLocaleString()} subtitle="Published & upcoming" icon={MapPinned} />
-        <KpiCard title="Platform Fees" value={formatCurrency(KPIS.platformFees, CURRENCY)} subtitle="Collected" icon={Percent} trend={{ value: '7.8%', positive: true }} />
-        <KpiCard title="Organizer Payouts" value={formatCurrency(KPIS.organizerPayouts, CURRENCY)} subtitle="Paid to partners" icon={HandCoins} />
-      </div>
-
-      {/* Revenue overview */}
-      <RevenueOverview />
-
-      {/* Recent activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent orders */}
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-foreground">Recent Orders</h2>
-            <span className="text-xs text-muted-foreground">Last 5</span>
-          </div>
-          <div className="space-y-1">
-            {RECENT_ORDERS.map((o) => (
-              <div key={o.id} className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-black/[0.03]">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{o.buyer}</p>
-                  <p className="truncate text-xs text-muted-foreground">{o.tour}</p>
-                </div>
-                <div className="ml-4 flex flex-shrink-0 items-center gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${orderStatusStyles[o.status]}`}>
-                    {o.status}
-                  </span>
-                  <span className="w-16 text-right text-sm font-semibold text-foreground">
-                    {formatCurrency(o.amount, CURRENCY)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent tours */}
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-foreground">Recent Tours</h2>
-            <span className="text-xs text-muted-foreground">Last 5</span>
-          </div>
-          <div className="space-y-1">
-            {RECENT_TOURS.map((t) => (
-              <div key={t.title} className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors hover:bg-black/[0.03]">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{t.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{t.organizer} · {t.city}</p>
-                </div>
-                <div className="ml-4 flex flex-shrink-0 items-center gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${tourStatusStyles[t.status]}`}>
-                    {t.status}
-                  </span>
-                  <span className="w-14 text-right text-sm font-semibold text-foreground">{t.sold} sold</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+      <div className="mt-2 text-3xl font-bold tabular-nums text-foreground">{value}</div>
+    </Link>
   );
 }

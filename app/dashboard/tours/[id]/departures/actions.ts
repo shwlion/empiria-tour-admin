@@ -188,6 +188,9 @@ export async function deleteDepartureAction(
       .from('departures')
       .select('starts_on, seats_booked, seats_held')
       .eq('id', departureId)
+      // Both ids arrive from the client; requiring them to agree stops a
+      // mismatched pair deleting from a tour the page was not showing.
+      .eq('package_id', packageId)
       .maybeSingle();
     if (!dep) return fail('That departure has already gone.');
     if (dep.seats_booked > 0) {

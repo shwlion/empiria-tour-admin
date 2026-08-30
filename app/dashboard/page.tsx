@@ -7,6 +7,7 @@ import { requireStaff } from '@/lib/auth';
 import { listPackages } from '@/lib/admin/packages';
 import { listUpcomingDepartures } from '@/lib/admin/departures';
 import { getSettings, settingsGaps } from '@/lib/admin/settings';
+import { contentGaps } from '@/lib/admin/content';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Overview · Empiria Tour Admin' };
@@ -24,10 +25,11 @@ export default async function OverviewPage() {
   const user = await requireStaff();
   const scope = user.can.scopedToOwnPackages ? user.id : null;
 
-  const [packages, departures, settings] = await Promise.all([
+  const [packages, departures, settings, content] = await Promise.all([
     listPackages(scope),
     listUpcomingDepartures(scope, 8),
     getSettings(),
+    user.can.manageSettings ? contentGaps() : Promise.resolve([]),
   ]);
 
   const live = packages.filter((p) => p.status === 'published');
@@ -56,6 +58,25 @@ export default async function OverviewPage() {
           <Link href="/dashboard/settings" className="mt-2 inline-block font-medium underline">
             Fix them in settings
           </Link>
+        </Banner>
+      )}
+
+      {content.length > 0 && (
+        <Banner tone="info">
+          <p className="font-medium text-foreground">
+            {content.length} {content.length === 1 ? 'thing the public site says' : 'things the public site says'} that
+            nobody has written yet.
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-0.5">
+            {content.map((gap) => (
+              <li key={gap.area + gap.detail}>
+                <Link href={gap.href} className="font-medium underline">
+                  {gap.area}
+                </Link>{' '}
+                — {gap.detail}
+              </li>
+            ))}
+          </ul>
         </Banner>
       )}
 

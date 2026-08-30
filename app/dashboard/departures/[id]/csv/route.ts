@@ -1,5 +1,5 @@
 import { requireCapability } from '@/lib/auth';
-import { getManifest, manifestToCsv } from '@/lib/admin/manifests';
+import { CSV_BOM, getManifest, manifestToCsv } from '@/lib/admin/manifests';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,8 @@ export async function GET(
   if (!manifest) return new Response('Not found', { status: 404 });
 
   const filename = `manifest-${manifest.packageSlug}-${manifest.startsOn}.csv`;
-  return new Response(manifestToCsv(manifest), {
+  // Without the BOM, Excel on Windows mangles every non-ASCII name on the list.
+  return new Response(CSV_BOM + manifestToCsv(manifest), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,

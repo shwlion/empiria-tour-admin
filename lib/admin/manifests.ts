@@ -222,6 +222,18 @@ export function formatEmergencyContact(c: EmergencyContact): string {
   return parts.join(' · ');
 }
 
+/**
+ * A UTF-8 byte-order mark.
+ *
+ * Excel on Windows assumes the system code page for a .csv unless the file
+ * opens with this, which turns every non-ASCII name on the manifest into
+ * mojibake — and a passenger list is exactly where names like Nguyễn, José and
+ * 김민준 appear. Three bytes to stop a support ticket. Prepended at the
+ * response rather than inside `manifestToCsv`, so that function still returns
+ * CSV and not CSV-plus-a-surprise.
+ */
+export const CSV_BOM = '\uFEFF';
+
 /** RFC 4180 quoting: doubled quotes, wrapped when a comma, quote or newline appears. */
 function csvCell(value: string | number | null | undefined): string {
   const s = value == null ? '' : String(value);

@@ -35,10 +35,10 @@ const ITEMS: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard, built: true },
   { name: 'Tours', href: '/dashboard/tours', icon: MapPinned, built: true, requires: 'managePackages' },
   { name: 'Departures', href: '/dashboard/departures', icon: CalendarRange, built: true, requires: 'managePackages' },
-  { name: 'Bookings', href: '/dashboard/bookings', icon: ShoppingBag, built: false, requires: 'manageBookings' },
+  { name: 'Bookings', href: '/dashboard/bookings', icon: ShoppingBag, built: true, requires: 'manageBookings' },
   { name: 'Customers', href: '/dashboard/customers', icon: Users, built: false, requires: 'manageCustomers' },
   { name: 'Revenue', href: '/dashboard/revenue', icon: BarChart3, built: false, requires: 'viewFinance' },
-  { name: 'Content', href: '/dashboard/content', icon: FileText, built: true, requires: 'manageSettings' },
+  { name: 'Content', href: '/dashboard/content', icon: FileText, built: false, requires: 'manageSettings' },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings, built: true, requires: 'manageSettings' },
 ];
 

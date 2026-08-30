@@ -43,7 +43,13 @@ export default async function AllDeparturesPage() {
           {departures.map((d) => (
             <tr key={d.id} className="transition-colors hover:bg-secondary/50">
               <td className="px-4 py-3">
-                <div className="font-medium text-foreground">{formatDepartureDate(d.startsOn)}</div>
+                <Link
+                  href={`/dashboard/departures/${d.id}`}
+                  className="font-medium text-foreground transition-colors hover:text-primary"
+                  title="Open the manifest"
+                >
+                  {formatDepartureDate(d.startsOn)}
+                </Link>
                 {d.endsOn && (
                   <div className="text-[12px] text-muted-foreground">to {formatDepartureDate(d.endsOn)}</div>
                 )}

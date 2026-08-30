@@ -17,7 +17,7 @@ import type { StaffUser } from './auth';
 
 export type AuditAction =
   | 'create' | 'update' | 'delete' | 'publish' | 'unpublish' | 'archive'
-  | 'generate' | 'open_sales' | 'close_sales';
+  | 'generate' | 'open_sales' | 'close_sales' | 'record_payment';
 
 export type AuditEntry = {
   entity: string;

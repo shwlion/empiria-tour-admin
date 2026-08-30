@@ -249,6 +249,18 @@ const BADGE_STYLES: Record<string, string> = {
   sold_out: 'bg-amber-100 text-amber-700',
   archived: 'bg-black/8 text-muted-foreground',
   cancelled: 'bg-red-100 text-red-600',
+  // Booking lifecycle (B3). paid_in_full is the good end state; pending_payment
+  // is a hold that may still evaporate, so it reads as caution, not success.
+  pending_payment: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  balance_due: 'bg-amber-100 text-amber-700',
+  paid_in_full: 'bg-emerald-100 text-emerald-700',
+  travelled: 'bg-black/8 text-muted-foreground',
+  refunded: 'bg-red-100 text-red-600',
+  // Payment rows.
+  succeeded: 'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  failed: 'bg-red-100 text-red-600',
 };
 
 export function Badge({ value }: { value: string }) {

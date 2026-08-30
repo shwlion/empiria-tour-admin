@@ -261,6 +261,7 @@ export type Database = {
           balance_due_on: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          checkout_session_ref: string | null
           children: number
           created_at: string
           currency: string
@@ -298,6 +299,7 @@ export type Database = {
           balance_due_on?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          checkout_session_ref?: string | null
           children?: number
           created_at?: string
           currency?: string
@@ -335,6 +337,7 @@ export type Database = {
           balance_due_on?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
+          checkout_session_ref?: string | null
           children?: number
           created_at?: string
           currency?: string
@@ -1684,6 +1687,10 @@ export type Database = {
       }
     }
     Functions: {
+      abandon_booking: {
+        Args: { p_booking: string; p_session: string }
+        Returns: boolean
+      }
       claim_seats: {
         Args: {
           p_departure: string
@@ -1719,6 +1726,7 @@ export type Database = {
           balance_due_on: string | null
           cancelled_at: string | null
           cancelled_by: string | null
+          checkout_session_ref: string | null
           children: number
           created_at: string
           currency: string
@@ -1775,6 +1783,53 @@ export type Database = {
       is_staff: { Args: never; Returns: boolean }
       next_booking_reference: { Args: never; Returns: string }
       owns_package: { Args: { pkg: string }; Returns: boolean }
+      record_payment: {
+        Args: { p_payload: Json }
+        Returns: {
+          adults: number
+          amount_paid_cents: number
+          balance_cents: number | null
+          balance_due_on: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          checkout_session_ref: string | null
+          children: number
+          created_at: string
+          currency: string
+          departure_id: string
+          deposit_due_cents: number
+          discount_cents: number
+          fees_cents: number
+          fx_rate_to_base: number | null
+          id: string
+          infants: number
+          lead_address: Json | null
+          lead_email: string
+          lead_name: string
+          lead_phone: string | null
+          notes_internal: string | null
+          package_id: string
+          promotion_id: string | null
+          reference: string
+          room_type_id: string | null
+          single_supplement: boolean
+          status: string
+          subtotal_cents: number
+          supplier_cost_base_cents: number | null
+          supplier_cost_cents: number | null
+          tax_cents: number
+          total_base_cents: number | null
+          total_cents: number
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       release_hold: {
         Args: { p_hold: string; p_session: string }
         Returns: boolean

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, MapPinned, CalendarRange, ShoppingBag,
   Users, BarChart3, FileText, Settings, LogOut,
+  Handshake,
 } from 'lucide-react';
 import type { Capabilities, Role } from '@/lib/auth';
 
@@ -38,6 +39,7 @@ const ITEMS: NavItem[] = [
   { name: 'Bookings', href: '/dashboard/bookings', icon: ShoppingBag, built: true, requires: 'manageBookings' },
   { name: 'Customers', href: '/dashboard/customers', icon: Users, built: false, requires: 'manageCustomers' },
   { name: 'Revenue', href: '/dashboard/revenue', icon: BarChart3, built: false, requires: 'viewFinance' },
+  { name: 'Partners', href: '/dashboard/partners', icon: Handshake, built: true, requires: 'manageSettings' },
   { name: 'Content', href: '/dashboard/content', icon: FileText, built: true, requires: 'manageSettings' },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings, built: true, requires: 'manageSettings' },
 ];

@@ -1368,6 +1368,87 @@ export type Database = {
           },
         ]
       }
+      partner_applications: {
+        Row: {
+          approved_user_id: string | null
+          company_name: string
+          contact_name: string
+          country: string | null
+          created_at: string
+          departures_per_year: number | null
+          email: string
+          id: string
+          message: string | null
+          operating_regions: string | null
+          phone: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["application_status"]
+          submitted_ip: string | null
+          tour_types: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          approved_user_id?: string | null
+          company_name: string
+          contact_name: string
+          country?: string | null
+          created_at?: string
+          departures_per_year?: number | null
+          email: string
+          id?: string
+          message?: string | null
+          operating_regions?: string | null
+          phone?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          submitted_ip?: string | null
+          tour_types?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          approved_user_id?: string | null
+          company_name?: string
+          contact_name?: string
+          country?: string | null
+          created_at?: string
+          departures_per_year?: number | null
+          email?: string
+          id?: string
+          message?: string | null
+          operating_regions?: string | null
+          phone?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          submitted_ip?: string | null
+          tour_types?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_applications_approved_user_id_fkey"
+            columns: ["approved_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_applications_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount_cents: number
@@ -1798,6 +1879,15 @@ export type Database = {
         Args: { p_booking: string; p_session: string }
         Returns: boolean
       }
+      approve_partner_application: {
+        Args: {
+          p_application: string
+          p_note?: string
+          p_reviewer: string
+          p_user: string
+        }
+        Returns: undefined
+      }
       claim_email_batch: {
         Args: { p_limit?: number }
         Returns: {
@@ -1983,12 +2073,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reject_partner_application: {
+        Args: { p_application: string; p_note?: string; p_reviewer: string }
+        Returns: undefined
+      }
       release_hold: {
         Args: { p_hold: string; p_session: string }
         Returns: boolean
       }
+      submit_partner_application: { Args: { p_payload: Json }; Returns: string }
     }
     Enums: {
+      application_status: "pending" | "approved" | "rejected" | "withdrawn"
       email_status: "queued" | "sending" | "sent" | "failed" | "cancelled"
     }
     CompositeTypes: {
@@ -2117,6 +2213,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      application_status: ["pending", "approved", "rejected", "withdrawn"],
       email_status: ["queued", "sending", "sent", "failed", "cancelled"],
     },
   },

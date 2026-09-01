@@ -8,6 +8,7 @@ import { listPackages } from '@/lib/admin/packages';
 import { listUpcomingDepartures } from '@/lib/admin/departures';
 import { getSettings, settingsGaps } from '@/lib/admin/settings';
 import { contentGaps } from '@/lib/admin/content';
+import { countPending } from '@/lib/admin/partners';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Overview · Empiria Tour Admin' };
@@ -25,11 +26,12 @@ export default async function OverviewPage() {
   const user = await requireStaff();
   const scope = user.can.scopedToOwnPackages ? user.id : null;
 
-  const [packages, departures, settings, content] = await Promise.all([
+  const [packages, departures, settings, content, pendingPartners] = await Promise.all([
     listPackages(scope),
     listUpcomingDepartures(scope, 8),
     getSettings(),
     user.can.manageSettings ? contentGaps() : Promise.resolve([]),
+    user.can.manageSettings ? countPending() : Promise.resolve(0),
   ]);
 
   const live = packages.filter((p) => p.status === 'published');
@@ -43,6 +45,23 @@ export default async function OverviewPage() {
         title={`Good to see you${user.name ? `, ${user.name.split(' ')[0]}` : ''}`}
         description="What is on sale, what is going out, and what is still in the way."
       />
+
+      {pendingPartners > 0 && (
+        <Banner tone="info">
+          <p className="font-medium">
+            {pendingPartners} partner {pendingPartners === 1 ? 'application is' : 'applications are'}{' '}
+            waiting on a decision.
+          </p>
+          <p className="mt-1">
+            Nobody becomes a partner without one of these being approved, so an unread queue is
+            somebody waiting.{' '}
+            <Link href="/dashboard/partners" className="underline underline-offset-2">
+              Review them
+            </Link>
+            .
+          </p>
+        </Banner>
+      )}
 
       {gaps.length > 0 && (
         <Banner tone="error">

@@ -1,18 +1,18 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Banner, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
+import { Banner, Field, Input, Select, SubmitButton, Textarea, inputClass } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import {
   recordManualPaymentAction,
+  resendEmailAction,
   saveInternalNotesAction,
   saveSupplierCostAction,
 } from './actions';
 
 /**
- * The three small forms on the booking detail page. Split from the page so the
- * page itself stays a server component and only these islands ship to the
- * browser.
+ * The small forms on the booking detail page. Split from the page so the page
+ * itself stays a server component and only these islands ship to the browser.
  */
 
 function ResultLine({ state }: { state: ActionResult | null }) {
@@ -145,6 +145,44 @@ export function SupplierCostForm({
       <div className="mt-3 flex justify-end">
         <SubmitButton variant="secondary">Save cost</SubmitButton>
       </div>
+    </form>
+  );
+}
+
+/**
+ * Send one of the traveller-facing messages again.
+ *
+ * A select and a button rather than a row of them: five templates as five
+ * buttons is a wall, and the one somebody wants is usually not the first.
+ */
+export function ResendForm({
+  bookingId,
+  options,
+}: {
+  bookingId: string;
+  options: readonly { key: string; label: string }[];
+}) {
+  const action = resendEmailAction.bind(null, bookingId);
+  const [state, formAction] = useActionState(action, null);
+
+  return (
+    <form action={formAction} className="flex flex-wrap items-end gap-2">
+      <div className="min-w-[200px] flex-1">
+        <label htmlFor="template_key" className="mb-1.5 block text-[13px] font-medium text-foreground">
+          Send again
+        </label>
+        <select id="template_key" name="template_key" className={inputClass} defaultValue={options[0]?.key}>
+          {options.map((o) => (
+            <option key={o.key} value={o.key}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+      <SubmitButton variant="secondary">Queue it</SubmitButton>
+      {state && (
+        <p className={`w-full text-[13px] ${state.ok ? 'text-muted-foreground' : 'text-destructive'}`}>
+          {state.message}
+        </p>
+      )}
     </form>
   );
 }

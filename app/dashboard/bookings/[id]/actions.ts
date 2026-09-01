@@ -6,6 +6,7 @@ import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
 import { cents, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
+import { RESENDABLE } from '@/lib/admin/emails';
 
 /**
  * The three writes B3 actually owns.
@@ -174,5 +175,78 @@ export async function saveSupplierCostAction(
     return ok(undefined, 'Supplier cost saved.');
   } catch (error) {
     return fail(explain(error));
+  }
+}
+
+// ─── Part C: send it again ─────────────────────────────────────────────────
+
+/**
+ * B3's "resend confirmation, receipt, or balance-reminder emails".
+ *
+ * A plain enqueue with **no dedupe key**, which is the whole point: the
+ * automatic sends carry one so a webhook redelivery cannot double them, and a
+ * staff member pressing this button means "send it again" and must not be
+ * swallowed by that same guard.
+ *
+ * Nothing is rendered or transmitted here. The row joins the outbox and leaves
+ * on the next tick, through the one code path that talks to the mail provider.
+ */
+export async function resendEmailAction(
+  bookingId: string,
+  _prev: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  try {
+    const user = await requireCapability('manageBookings');
+    const db = requireWritableDb();
+    const templateKey = text(form.get('template_key'));
+
+    if (!RESENDABLE.some((r) => r.key === templateKey)) {
+      return fail('That is not a message staff can send by hand.');
+    }
+
+    const { data: booking } = await db
+      .from('bookings')
+      .select('id, reference, lead_email, lead_name')
+      .eq('id', bookingId)
+      .maybeSingle();
+    if (!booking) return fail('That booking no longer exists.');
+    if (!booking.lead_email) return fail('This booking has no email address on it.');
+
+    // The facts are rebuilt from the booking as it stands now, not copied from
+    // the original send — a resent balance reminder should quote today's
+    // balance, not the one from three weeks ago.
+    const { data: existing } = await db
+      .from('email_messages')
+      .select('merge_data')
+      .eq('booking_id', bookingId)
+      .eq('template_key', templateKey)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { error } = await db.rpc('enqueue_email', {
+      p_payload: {
+        template_key: templateKey,
+        to_email: booking.lead_email,
+        to_name: booking.lead_name,
+        booking_id: bookingId,
+        merge_data: existing?.merge_data ?? {},
+        dedupe_key: null,
+      } as never,
+    });
+    if (error) throw new Error(error.message);
+
+    await recordAudit(db, user, {
+      entity: 'booking',
+      entityId: bookingId,
+      action: 'resend_email',
+      summary: `Queued a ${templateKey.replace(/_/g, ' ')} email to ${booking.lead_email}`,
+    });
+
+    revalidatePath(`/dashboard/bookings/${bookingId}`);
+    return ok(undefined, 'Queued. It goes out on the next send.');
+  } catch (error) {
+    return fail(explain(error, 'That could not be queued.'));
   }
 }

@@ -6,8 +6,9 @@ import { Badge, Card, Table } from '@/components/ui';
 import { formatDateRange, formatDepartureDate, formatPrice } from '@/lib/money';
 import { requireCapability } from '@/lib/auth';
 import { getBookingDetail } from '@/lib/admin/bookings';
+import { RESENDABLE, listEmailsForBooking } from '@/lib/admin/emails';
 import { formatEmergencyContact } from '@/lib/admin/manifests';
-import { ManualPaymentForm, NotesForm, SupplierCostForm } from './forms';
+import { ManualPaymentForm, NotesForm, ResendForm, SupplierCostForm } from './forms';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Booking · Empiria Tour Admin' };
@@ -35,6 +36,7 @@ export default async function BookingDetailPage({
   const user = await requireCapability('manageBookings');
   const { id } = await params;
   const booking = await getBookingDetail(id, user.can.scopedToOwnPackages ? user.id : null);
+  const emails = booking ? await listEmailsForBooking(booking.id) : [];
   if (!booking) notFound();
 
   const outstanding = Math.max(booking.totalCents - booking.amountPaidCents, 0);
@@ -295,6 +297,48 @@ export default async function BookingDetailPage({
               />
             </Card>
           )}
+
+          <Card
+            title="Emails"
+            description="What the platform has sent about this booking, and what it actually said."
+          >
+            {emails.length === 0 ? (
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Nothing queued yet. Messages appear here as the booking moves —
+                confirmation on payment, reminders as dates approach.
+              </p>
+            ) : (
+              <ul className="mb-4 flex flex-col divide-y divide-border">
+                {emails.map((m) => (
+                  <li key={m.id} className="py-2.5 first:pt-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-[13px] font-medium capitalize text-foreground">
+                        {m.templateKey.replace(/_/g, ' ')}
+                      </span>
+                      <Badge value={m.status} />
+                    </div>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {m.sentAt
+                        ? `Sent ${formatDepartureDate(m.sentAt)} to ${m.toEmail}`
+                        : `Queued ${formatDepartureDate(m.createdAt)} for ${m.toEmail}`}
+                      {m.attempts > 1 && ` · ${m.attempts} attempts`}
+                    </p>
+                    {m.subjectSnapshot && (
+                      <p className="mt-0.5 text-[12px] text-foreground">{m.subjectSnapshot}</p>
+                    )}
+                    {m.lastError && (
+                      <p className="mt-0.5 text-[12px] text-destructive">{m.lastError}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <ResendForm bookingId={booking.id} options={RESENDABLE} />
+            <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+              Nothing leaves the queue until the Resend sending domain is verified.
+              A message sitting here is waiting on that, not lost.
+            </p>
+          </Card>
 
           <Card title="Notes">
             <NotesForm bookingId={booking.id} notes={booking.notesInternal} />

@@ -17,7 +17,11 @@ import type { StaffUser } from './auth';
 
 export type AuditAction =
   | 'create' | 'update' | 'delete' | 'publish' | 'unpublish' | 'archive'
-  | 'generate' | 'open_sales' | 'close_sales' | 'record_payment';
+  | 'generate' | 'open_sales' | 'close_sales' | 'record_payment'
+  // Part C. Queuing a message by hand is a staff action against a customer,
+  // and "who resent the confirmation, and when" is exactly the kind of question
+  // the trail exists to answer.
+  | 'resend_email';
 
 export type AuditEntry = {
   entity: string;

@@ -805,6 +805,104 @@ export type Database = {
           },
         ]
       }
+      email_messages: {
+        Row: {
+          attempts: number
+          body_snapshot: string | null
+          booking_id: string | null
+          created_at: string
+          dedupe_key: string | null
+          departure_id: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          merge_data: Json
+          provider: string
+          provider_ref: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["email_status"]
+          subject_snapshot: string | null
+          template_key: string
+          to_email: string
+          to_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          body_snapshot?: string | null
+          booking_id?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          departure_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          merge_data?: Json
+          provider?: string
+          provider_ref?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_status"]
+          subject_snapshot?: string | null
+          template_key: string
+          to_email: string
+          to_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          body_snapshot?: string | null
+          booking_id?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          departure_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          merge_data?: Json
+          provider?: string
+          provider_ref?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_status"]
+          subject_snapshot?: string | null
+          template_key?: string
+          to_email?: string
+          to_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_departure_id_fkey"
+            columns: ["departure_id"]
+            isOneToOne: false
+            referencedRelation: "departures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_template_key_fkey"
+            columns: ["template_key"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "email_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           body_html: string
@@ -1329,6 +1427,7 @@ export type Database = {
       }
       platform_settings: {
         Row: {
+          balance_reminder_days: number
           company_name: string | null
           contact_address: Json | null
           contact_email: string | null
@@ -1336,7 +1435,9 @@ export type Database = {
           default_currency: string
           hold_minutes: number
           id: boolean
+          installment_reminder_days: number
           payment_window_minutes: number
+          pre_departure_days: number
           registration_number: string | null
           social_links: Json
           statutory_notice: string | null
@@ -1345,6 +1446,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          balance_reminder_days?: number
           company_name?: string | null
           contact_address?: Json | null
           contact_email?: string | null
@@ -1352,7 +1454,9 @@ export type Database = {
           default_currency?: string
           hold_minutes?: number
           id?: boolean
+          installment_reminder_days?: number
           payment_window_minutes?: number
+          pre_departure_days?: number
           registration_number?: string | null
           social_links?: Json
           statutory_notice?: string | null
@@ -1361,6 +1465,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          balance_reminder_days?: number
           company_name?: string | null
           contact_address?: Json | null
           contact_email?: string | null
@@ -1368,7 +1473,9 @@ export type Database = {
           default_currency?: string
           hold_minutes?: number
           id?: boolean
+          installment_reminder_days?: number
           payment_window_minutes?: number
+          pre_departure_days?: number
           registration_number?: string | null
           social_links?: Json
           statutory_notice?: string | null
@@ -1691,6 +1798,37 @@ export type Database = {
         Args: { p_booking: string; p_session: string }
         Returns: boolean
       }
+      claim_email_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body_snapshot: string | null
+          booking_id: string | null
+          created_at: string
+          dedupe_key: string | null
+          departure_id: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          merge_data: Json
+          provider: string
+          provider_ref: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["email_status"]
+          subject_snapshot: string | null
+          template_key: string
+          to_email: string
+          to_name: string | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "email_messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_seats: {
         Args: {
           p_departure: string
@@ -1773,6 +1911,8 @@ export type Database = {
         Args: { p_currency: string; p_departure_id: string }
         Returns: number
       }
+      enqueue_due_reminders: { Args: never; Returns: number }
+      enqueue_email: { Args: { p_payload: Json }; Returns: string }
       expire_stale_holds: { Args: { p_departure?: string }; Returns: number }
       extend_hold: {
         Args: { p_hold: string; p_session: string }
@@ -1781,6 +1921,19 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_partner: { Args: never; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
+      mark_email_failed: {
+        Args: { p_error: string; p_id: string; p_max_attempts?: number }
+        Returns: undefined
+      }
+      mark_email_sent: {
+        Args: {
+          p_body: string
+          p_id: string
+          p_provider_ref: string
+          p_subject: string
+        }
+        Returns: undefined
+      }
       next_booking_reference: { Args: never; Returns: string }
       owns_package: { Args: { pkg: string }; Returns: boolean }
       record_payment: {
@@ -1836,7 +1989,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      email_status: "queued" | "sending" | "sent" | "failed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1963,6 +2116,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      email_status: ["queued", "sending", "sent", "failed", "cancelled"],
+    },
   },
 } as const

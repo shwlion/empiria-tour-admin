@@ -1,6 +1,7 @@
 import TopNav from '@/components/TopNav';
 import { requireStaff } from '@/lib/auth';
 import { isDbWritable } from '@/lib/supabase';
+import { countPending } from '@/lib/admin/partners';
 import { Banner } from '@/components/ui';
 
 /**
@@ -11,10 +12,20 @@ import { Banner } from '@/components/ui';
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireStaff();
   const writable = isDbWritable();
+  // A head-only count, so this costs one cheap round trip per page rather than
+  // a list nobody asked for. Skipped entirely for an agent, who cannot open the
+  // section anyway.
+  const pendingPartners = user.can.manageSettings ? await countPending() : 0;
 
   return (
     <div className="min-h-screen">
-      <TopNav name={user.name} email={user.email} role={user.role} can={user.can} />
+      <TopNav
+        name={user.name}
+        email={user.email}
+        role={user.role}
+        can={user.can}
+        counts={{ partners: pendingPartners }}
+      />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {!writable && (
           <Banner tone="error">

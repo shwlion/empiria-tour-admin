@@ -21,16 +21,26 @@ import type { Capabilities, Role } from '@/lib/auth';
  *  - Sections the person's role cannot use are not shown — but the hiding is
  *    cosmetic. Every route re-checks the capability server-side, because a
  *    missing link has never stopped anybody typing a URL.
+ *
+ * A section that holds a queue carries its depth in the nav. Somebody halfway
+ * through a booking has no reason to visit Partners, and no way to learn that
+ * three operators are waiting on a decision — unless the tab says so from
+ * wherever they happen to be standing.
  */
 
 type NavItem = {
   name: string;
   href: string;
+  /** Key into `counts`, for a section that holds a queue. */
+  badge?: keyof NavCounts;
   icon: typeof LayoutDashboard;
   /** Built and routable. The rest are listed so the order is decided once. */
   built: boolean;
   requires?: keyof Capabilities;
 };
+
+/** Queue depths the nav can surface. One key per section that has a queue. */
+export type NavCounts = { partners?: number };
 
 const ITEMS: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard, built: true },
@@ -39,7 +49,7 @@ const ITEMS: NavItem[] = [
   { name: 'Bookings', href: '/dashboard/bookings', icon: ShoppingBag, built: true, requires: 'manageBookings' },
   { name: 'Customers', href: '/dashboard/customers', icon: Users, built: false, requires: 'manageCustomers' },
   { name: 'Revenue', href: '/dashboard/revenue', icon: BarChart3, built: false, requires: 'viewFinance' },
-  { name: 'Partners', href: '/dashboard/partners', icon: Handshake, built: true, requires: 'manageSettings' },
+  { name: 'Partners', href: '/dashboard/partners', icon: Handshake, built: true, requires: 'manageSettings', badge: 'partners' },
   { name: 'Content', href: '/dashboard/content', icon: FileText, built: true, requires: 'manageSettings' },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings, built: true, requires: 'manageSettings' },
 ];
@@ -49,11 +59,13 @@ export default function TopNav({
   email,
   role,
   can,
+  counts = {},
 }: {
   name: string | null;
   email: string | null;
   role: Role;
   can: Capabilities;
+  counts?: NavCounts;
 }) {
   const pathname = usePathname();
   const visible = ITEMS.filter((i) => i.built && (!i.requires || can[i.requires]));
@@ -101,6 +113,14 @@ export default function TopNav({
               >
                 <item.icon size={15} aria-hidden="true" />
                 {item.name}
+                {item.badge && (counts[item.badge] ?? 0) > 0 && (
+                  <span
+                    className="ml-0.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-primary px-1.5 py-px text-[10px] font-bold tabular-nums text-white"
+                    aria-label={`${counts[item.badge]} waiting`}
+                  >
+                    {counts[item.badge]}
+                  </span>
+                )}
               </Link>
             );
           })}

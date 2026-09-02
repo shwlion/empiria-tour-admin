@@ -16,6 +16,11 @@ export const dynamic = 'force-dynamic';
 type Reason = { title: string; body: string; action?: { href: string; label: string } };
 
 const REASONS: Record<string, Reason> = {
+  closed: {
+    title: 'This account has been closed',
+    body:
+      'Somebody at Empiria deactivated it, so it can no longer sign in. If that was not meant to happen, another administrator can reopen it from Settings — the account and everything it did are still there.',
+  },
   unconfigured: {
     title: 'This console is not connected',
     body:

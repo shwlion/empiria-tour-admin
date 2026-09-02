@@ -91,9 +91,17 @@ export async function requireStaff(): Promise<StaffUser> {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('role, full_name')
+    .select('role, full_name, status')
     .eq('id', user.id)
     .maybeSingle();
+
+  // Status is checked before role, and separately from it. A closed account
+  // keeps whatever role it had — that is how it can be reopened — so a guard
+  // that read only the role would let a deactivated administrator carry on
+  // working, and "deactivate" would be a button that lies.
+  if (profile?.status === 'closed') {
+    redirect('/unauthorized?reason=closed');
+  }
 
   const role = (profile?.role as Role | undefined) ?? 'traveller';
   if (role !== 'admin' && role !== 'agent') {

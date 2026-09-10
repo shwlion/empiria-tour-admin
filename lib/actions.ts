@@ -44,6 +44,7 @@ export function explain(error: unknown, fallback = 'That did not save. Please tr
     [/duplicate key.*currencies_pkey/i, 'That currency is already configured.'],
     [/duplicate key/i, 'Something with that name or reference already exists.'],
     [/departures_capacity_not_exceeded/i, 'Capacity cannot go below the seats already booked or held.'],
+    [/showcase_cards_.*_check/i, 'A field is over its length limit, or the link is not a storefront path.'],
     [/violates foreign key/i, 'That refers to something which no longer exists. Reload and try again.'],
     [/violates check constraint/i, 'One of those values is out of range.'],
     [/violates not-null/i, 'A required field was left empty.'],

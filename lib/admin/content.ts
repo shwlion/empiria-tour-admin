@@ -8,6 +8,9 @@ import { getSupabaseAdmin } from '@/lib/supabase';
  * transactional email templates. All three existed as rows with placeholder or
  * empty bodies, which is the worst of both worlds — the mechanism works, so
  * nothing looks broken, and the words are wrong.
+ *
+ * Plus the landing page's four postcards (migration 0012), which shipped with
+ * Elevsoft's stand-in photographs for the same reason.
  */
 
 // ─── Static pages ─────────────────────────────────────────────────────────
@@ -230,6 +233,72 @@ export async function getEmailTemplate(key: string): Promise<EmailTemplate | nul
   return data ? decorate(data) : null;
 }
 
+// ─── Showcase postcards ───────────────────────────────────────────────────
+
+/**
+ * How many postcards the landing page shows. `getShowcaseCards()` in the
+ * storefront's `lib/catalogue.ts` takes the first four published rows, so a
+ * fifth published card is never seen and a third leaves a hole in the deck.
+ */
+export const SHOWCASE_SLOTS = 4;
+
+/** Migration 0012's check constraints, so the form can refuse before the database has to. */
+export const SHOWCASE_LIMITS = { title: 60, kicker: 40, description: 140 } as const;
+
+export type ShowcaseCardRecord = {
+  id: string;
+  title: string;
+  /** A mood line — "Islands · Slow travel" — never a date or a price. */
+  kicker: string;
+  description: string;
+  imageUrl: string;
+  imageAlt: string;
+  /** A storefront path; the expanded postcard's one button goes here. */
+  linkUrl: string;
+  sortOrder: number;
+  status: 'draft' | 'published';
+  updatedAt: string;
+};
+
+function toShowcaseCard(r: {
+  id: string; title: string; kicker: string; description: string; image_url: string;
+  image_alt: string; link_url: string; sort_order: number; status: string; updated_at: string;
+}): ShowcaseCardRecord {
+  return {
+    id: r.id,
+    title: r.title,
+    kicker: r.kicker,
+    description: r.description,
+    imageUrl: r.image_url,
+    imageAlt: r.image_alt,
+    linkUrl: r.link_url,
+    sortOrder: r.sort_order,
+    // The database constrains it to these two; narrowing here keeps the
+    // editor's Publish/Unpublish switch honest without a cast at each use.
+    status: r.status === 'published' ? 'published' : 'draft',
+    updatedAt: r.updated_at,
+  };
+}
+
+/** Every card, drafts included, in the order the landing page would show them. */
+export async function listShowcaseCards(): Promise<ShowcaseCardRecord[]> {
+  const db = getSupabaseAdmin();
+  if (!db) return [];
+  const { data } = await db
+    .from('showcase_cards')
+    .select('*')
+    .order('sort_order')
+    .order('created_at');
+  return (data ?? []).map(toShowcaseCard);
+}
+
+export async function getShowcaseCard(id: string): Promise<ShowcaseCardRecord | null> {
+  const db = getSupabaseAdmin();
+  if (!db) return null;
+  const { data } = await db.from('showcase_cards').select('*').eq('id', id).maybeSingle();
+  return data ? toShowcaseCard(data) : null;
+}
+
 // ─── What is still missing ────────────────────────────────────────────────
 
 export type ContentGap = { area: string; detail: string; href: string };
@@ -239,10 +308,11 @@ export type ContentGap = { area: string; detail: string; href: string };
  * showing that Empiria has not actually written.
  */
 export async function contentGaps(): Promise<ContentGap[]> {
-  const [pages, blocks, templates] = await Promise.all([
+  const [pages, blocks, templates, cards] = await Promise.all([
     listStaticPages(),
     listDisclosureBlocks(),
     listEmailTemplates(),
+    listShowcaseCards(),
   ]);
   const gaps: ContentGap[] = [];
 
@@ -278,6 +348,20 @@ export async function contentGaps(): Promise<ContentGap[]> {
       area: 'Emails',
       detail: `${empty.length} of ${templates.length} templates are unwritten. Nothing sends yet, but they are what will.`,
       href: '/dashboard/content/emails',
+    });
+  }
+
+  // The hero deck has exactly four slots. Fewer leaves a gap on the landing
+  // page; more means somebody published a card that nobody will ever see.
+  const published = cards.filter((c) => c.status === 'published').length;
+  if (published !== SHOWCASE_SLOTS) {
+    gaps.push({
+      area: 'Showcase',
+      detail:
+        published === 0
+          ? 'No postcards are published — the landing page hero has nothing to show.'
+          : `${published} ${published === 1 ? 'postcard is' : 'postcards are'} published; the landing page shows ${SHOWCASE_SLOTS}.`,
+      href: '/dashboard/content/showcase',
     });
   }
 

@@ -5,6 +5,7 @@ import { requireStaff } from '@/lib/auth';
 import { getPackage, publishBlockers } from '@/lib/admin/packages';
 import EditorTabs from './EditorTabs';
 import StatusControl from './StatusControl';
+import { STOREFRONT_URL } from '@/lib/storefront';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export default async function TourEditorLayout({
             <span>/tours/{pkg.slug}</span>
             {pkg.status === 'published' && (
               <a
-                href={`https://empiriatours.com/tours/${pkg.slug}`}
+                href={`${STOREFRONT_URL}/tours/${pkg.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-primary hover:underline"

@@ -126,3 +126,17 @@ remaining pieces — destinations, collections and featured content, promotions,
 policies, ad placements, receipt template configuration; B3's tail — refunds,
 cancellation, amending a booking with recalculation, booking-list CSV, a custom
 notification to a departure, and the audit-trail view.
+
+## The showcase postcards
+
+`/dashboard/content/showcase` edits `showcase_cards` — the four illustrative
+postcards on the storefront's landing page. They are **content, not
+inventory** (migration 0012 gives them no dates, seats or prices; a kicker is
+a mood line like "Islands · Slow travel"). Gated on `manageSettings` like the
+rest of Content; every action validates the check constraints itself, parses
+`link_url` and root-relative `image_url` values rather than pattern-matching
+them, refuses to delete a published card, and writes an audit row. Images are
+pasted URLs (Supabase storage), as for tours — there is no upload. Links out
+to the storefront and previews of root-relative images use
+`lib/storefront.ts` (`NEXT_PUBLIC_TOUR_URL`, default the production domain).
+

@@ -7,6 +7,8 @@ const TABS = [
   { name: 'Pages', href: '/dashboard/content/pages' },
   { name: 'Disclosures', href: '/dashboard/content/disclosures' },
   { name: 'Emails', href: '/dashboard/content/emails' },
+  { name: 'Showcase', href: '/dashboard/content/showcase' },
+  { name: 'Blog', href: '/dashboard/content/blog' },
 ];
 
 export default function ContentTabs() {

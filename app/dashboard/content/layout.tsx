@@ -17,7 +17,7 @@ export default async function ContentLayout({ children }: { children: React.Reac
     <>
       <PageHeader
         title="Content"
-        description="Policy pages, the disclosure wording Part D turns on, and the eleven transactional emails. All of it renders on the public site; none of it was editable until now."
+        description="Policy pages, the disclosure wording Part D turns on, the eleven transactional emails, and the four postcards on the landing page. All of it renders on the public site; none of it was editable until now."
       />
       <ContentTabs />
       {children}

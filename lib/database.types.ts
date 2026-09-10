@@ -61,6 +61,92 @@ export type Database = {
           },
         ]
       }
+      blog_posts: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          destination_id: string | null
+          excerpt: string | null
+          hero_image: string | null
+          id: string
+          package_id: string | null
+          published_at: string | null
+          slug: string
+          status: string
+          title: string
+          unpublish_reason: string | null
+          unpublished_at: string | null
+          unpublished_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body?: string
+          created_at?: string
+          destination_id?: string | null
+          excerpt?: string | null
+          hero_image?: string | null
+          id?: string
+          package_id?: string | null
+          published_at?: string | null
+          slug: string
+          status?: string
+          title: string
+          unpublish_reason?: string | null
+          unpublished_at?: string | null
+          unpublished_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          destination_id?: string | null
+          excerpt?: string | null
+          hero_image?: string | null
+          id?: string
+          package_id?: string | null
+          published_at?: string | null
+          slug?: string
+          status?: string
+          title?: string
+          unpublish_reason?: string | null
+          unpublished_at?: string | null
+          unpublished_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_destination_id_fkey"
+            columns: ["destination_id"]
+            isOneToOne: false
+            referencedRelation: "destinations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_unpublished_by_fkey"
+            columns: ["unpublished_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_acknowledgements: {
         Row: {
           accepted_at: string
@@ -1737,6 +1823,59 @@ export type Database = {
           },
         ]
       }
+      showcase_cards: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_alt: string
+          image_url: string
+          kicker: string
+          link_url: string
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          image_alt?: string
+          image_url: string
+          kicker?: string
+          link_url?: string
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_alt?: string
+          image_url?: string
+          kicker?: string
+          link_url?: string
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "showcase_cards_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       static_pages: {
         Row: {
           body: string
@@ -1944,6 +2083,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      close_own_account: { Args: { p_user: string }; Returns: undefined }
       confirm_hold_seats: { Args: { p_booking: string }; Returns: boolean }
       create_booking: {
         Args: { p_payload: Json }
@@ -2026,6 +2166,10 @@ export type Database = {
       }
       next_booking_reference: { Args: never; Returns: string }
       owns_package: { Args: { pkg: string }; Returns: boolean }
+      publish_blog_post: {
+        Args: { p_actor: string; p_post: string }
+        Returns: undefined
+      }
       record_payment: {
         Args: { p_payload: Json }
         Returns: {

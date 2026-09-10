@@ -5,6 +5,7 @@ import { Banner, Card, Field, Input, Select, SubmitButton } from '@/components/u
 import type { ActionResult } from '@/lib/actions';
 import { slugify } from '@/lib/admin/packages';
 import { createPackageAction } from '../actions';
+import { STOREFRONT_HOST } from '@/lib/storefront';
 
 export default function NewTourForm({
   destinations,
@@ -50,7 +51,7 @@ export default function NewTourForm({
           <Field
             label="Web address"
             htmlFor="slug"
-            hint={effectiveSlug ? `empiriatours.com/tours/${effectiveSlug}` : 'Filled in from the title.'}
+            hint={effectiveSlug ? `${STOREFRONT_HOST}/tours/${effectiveSlug}` : 'Filled in from the title.'}
           >
             <Input
               id="slug"

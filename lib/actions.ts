@@ -42,6 +42,7 @@ export function explain(error: unknown, fallback = 'That did not save. Please tr
     [/duplicate key.*static_pages_pkey/i, 'A page with that address already exists.'],
     [/duplicate key.*disclosure_blocks_slug_key/i, 'A disclosure block already uses that reference.'],
     [/duplicate key.*currencies_pkey/i, 'That currency is already configured.'],
+    [/duplicate key.*promotions_code_key/i, 'Another promotion already uses that code.'],
     [/duplicate key/i, 'Something with that name or reference already exists.'],
     [/departures_capacity_not_exceeded/i, 'Capacity cannot go below the seats already booked or held.'],
     [/showcase_cards_.*_check/i, 'A field is over its length limit, or the link is not a storefront path.'],

@@ -135,6 +135,13 @@ export type Database = {
             foreignKeyName: "blog_posts_package_id_fkey"
             columns: ["package_id"]
             isOneToOne: false
+            referencedRelation: "package_from_price"
+            referencedColumns: ["package_id"]
+          },
+          {
+            foreignKeyName: "blog_posts_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
             referencedRelation: "packages"
             referencedColumns: ["id"]
           },
@@ -2023,6 +2030,18 @@ export type Database = {
           p_application: string
           p_note?: string
           p_reviewer: string
+          p_user: string
+        }
+        Returns: undefined
+      }
+      check_promotion: {
+        Args: {
+          p_currency: string
+          p_discount_cents: number
+          p_email: string
+          p_package: string
+          p_promotion: string
+          p_subtotal_cents: number
           p_user: string
         }
         Returns: undefined

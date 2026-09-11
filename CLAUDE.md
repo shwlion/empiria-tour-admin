@@ -103,6 +103,13 @@ best-effort. Losing the record of a change is bad; losing the change is worse.
   `built: false` entries are listed so the order is decided once, and hidden.
 - **`parseTaxRules` is duplicated** with the storefront's `lib/pricing.ts`. That
   is the cost of three repos; keep them in step by hand.
+- **Promotion codes are enforced by `check_promotion`, under a lock, in the
+  database** (migration 0015). The screen under Settings validates the same
+  rules first so it can say what would be refused, but that is courtesy.
+  `usage_count` is maintained by a trigger on `bookings` — nothing in any repo
+  writes it. A code any booking names is switched off, never deleted:
+  `bookings.promotion_id` is `on delete set null`, and deleting would erase
+  the discount from the booking's history.
 
 ## Working in here
 
@@ -122,8 +129,8 @@ Instrument Sans / Space Mono, so a stub written for one will not cover the other
 
 B4 customers; B5 reporting and revenue share (fully specified now — §4.6(b)
 gives the formula, blocked only on Empiria entering supplier costs); B6's
-remaining pieces — destinations, collections and featured content, promotions,
-policies, ad placements, receipt template configuration; B3's tail — refunds,
+remaining pieces — destinations, collections and featured content, policies,
+ad placements, receipt template configuration; B3's tail — refunds,
 cancellation, amending a booking with recalculation, booking-list CSV, a custom
 notification to a departure, and the audit-trail view.
 

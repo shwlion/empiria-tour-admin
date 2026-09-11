@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Users } from 'lucide-react';
+import { Tag, Users } from 'lucide-react';
 import { Button, PageHeader } from '@/components/ui';
 import { requireStaff } from '@/lib/auth';
 import { getCurrencyCodes, getSettings, settingsGaps } from '@/lib/admin/settings';
@@ -20,12 +20,20 @@ export default async function SettingsPage() {
         description="Who Empiria is, how travellers reach them, and what gets added to every price. These values render on the public site — nothing here is internal."
         actions={
           user.can.manageSettings ? (
-            <Link href="/dashboard/settings/staff">
-              <Button variant="secondary">
-                <Users size={14} aria-hidden="true" />
-                Staff
-              </Button>
-            </Link>
+            <>
+              <Link href="/dashboard/settings/promotions">
+                <Button variant="secondary">
+                  <Tag size={14} aria-hidden="true" />
+                  Promotion codes
+                </Button>
+              </Link>
+              <Link href="/dashboard/settings/staff">
+                <Button variant="secondary">
+                  <Users size={14} aria-hidden="true" />
+                  Staff
+                </Button>
+              </Link>
+            </>
           ) : null
         }
       />

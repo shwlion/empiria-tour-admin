@@ -88,7 +88,7 @@ export default function TopNav({
     >
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
-          <Image src="/logo.png" alt="Empiria Tour" width={120} height={28} className="h-7 w-auto" priority />
+          <Image src="/logo.png" alt="Empiria Tours" width={1507} height={522} className="h-7 w-auto" priority />
           <span className="rounded-md bg-primary/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
             {role === 'agent' ? 'Agent' : 'Admin'}
           </span>

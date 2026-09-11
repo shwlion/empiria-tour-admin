@@ -34,7 +34,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Empiria Tour" className="mb-3 h-9 w-auto" />
+          <img src="/logo.png" alt="Empiria Tours" className="mb-3 h-9 w-auto" />
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
             <ShieldCheck size={12} /> Admin
           </span>

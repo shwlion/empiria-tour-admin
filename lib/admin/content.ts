@@ -37,6 +37,9 @@ export const REQUIRED_PAGES: { slug: string; title: string; route: string; why: 
   { slug: 'privacy', title: 'Privacy policy', route: '/privacy', why: 'Linked from the footer and from the cookie banner.' },
   { slug: 'booking-conditions', title: 'Booking conditions', route: '/booking-conditions', why: 'Linked from the Terms step of the booking flow.' },
   { slug: 'cancellation', title: 'Cancellation policy', route: '/cancellation', why: 'Linked from the Terms step and from every booking.' },
+  { slug: 'about', title: 'About Empiria Tours', route: '/about', why: 'Linked in the footer. §2.2 makes Empiria the seller of record, and this is where the site says who that is.' },
+  { slug: 'contact', title: 'Contact us', route: '/contact', why: 'Linked in the footer and promised by the trust band on the home page.' },
+  { slug: 'faq', title: 'Frequently asked questions', route: '/faq', why: 'Linked in the footer.' },
 ];
 
 export async function listStaticPages(): Promise<StaticPage[]> {

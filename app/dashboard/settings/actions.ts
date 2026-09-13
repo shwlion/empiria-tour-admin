@@ -88,6 +88,9 @@ export async function saveSettingsAction(
     hold_minutes: holdMinutes,
     payment_window_minutes: paymentWindow,
     tax_rates: rules,
+    receipt_title: nullable(form.get('receipt_title')),
+    receipt_intro: nullable(form.get('receipt_intro')),
+    receipt_footer: nullable(form.get('receipt_footer')),
     updated_at: new Date().toISOString(),
     updated_by: user.id,
   };

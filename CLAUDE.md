@@ -125,14 +125,59 @@ sandbox blocks either, stub `next/font/google` in `app/layout.tsx` for the build
 check only — this app uses Geist, the storefront uses Bricolage Grotesque /
 Instrument Sans / Space Mono, so a stub written for one will not cover the other.
 
+## Customers (B4)
+
+`/dashboard/customers` reads `customer_directory` (migration 0018): one row
+per customer — every traveller account plus every guest who booked, keyed on
+the account when there is one and on `guest:<email>` when there is not, with
+a guest booking made under an address that later registers attached to that
+account. Lifetime value is money received, in the default currency at each
+booking's frozen rate — never the value of unpaid bookings. Open to Agents.
+A registered customer's name, phone, address and marketing opt-in are edited
+here (audited, under the service role after the capability check, never the
+role); a guest's details are their bookings' and are edited there. The CSV
+route neutralises spreadsheet formulas in customer-typed cells.
+
+## Reports (B5)
+
+`/dashboard/reports`, Admin only (`viewFinance`). `lib/admin/reports.ts` is
+pure and tested: period boundaries are midnight in Toronto (`REPORT_TIMEZONE`),
+bookings belong to the period they were made in, money to the period it moved
+in (a refund counts when issued), balances are a snapshot. Everything is in
+the default currency via `fx_rate_to_base`. The §4.6 statement is computed
+per payment — tax and supplier cost pro-rated by the payment's share of the
+booking's total and signed, so a refund gives back its share — and it prints
+its own caveats (payments with no processor fee, payments on uncosted
+bookings) beside the lines they weaken. `REVENUE_SHARE_RATE` is 20%
+(§4.6(a)). The charts are server-rendered SVG: one series, one hue, thin
+rounded bars, native tooltips, and the tables beside them are the accessible
+view. When group 3a's transfer ledger lands, the statement reads from it.
+
+## Destinations and collections (B6)
+
+Under Content. Destinations are a tree whose `path` the storefront filters
+on; a slug or parent change goes through `move_destination` (0018), which
+rewrites every descendant's path in one statement and refuses a cycle.
+Archiving is refused while any tour points at the place or any child is
+live. Collections are shelves: membership is reconciled to the ticked tours
+in the form's order (members first), and the same screen holds the home
+page's featured row — the `is_featured` flag the tour editor also sets.
+Images are pasted https or root-relative addresses, as for the showcase.
+
+## Documents (B6)
+
+Settings → Documents: the receipt's title, a line under the masthead and a
+closing note (`platform_settings.receipt_*`, 0018). The storefront renders
+them around the receipt's immutable facts; legal wording still goes through
+disclosure blocks placed on the receipt.
+
 ## Not built
 
-B4 customers; B5 reporting and revenue share (fully specified now — §4.6(b)
-gives the formula, blocked only on Empiria entering supplier costs); B6's
-remaining pieces — destinations, collections and featured content, policies,
-ad placements, receipt template configuration; B3's tail — refunds,
-cancellation, amending a booking with recalculation, booking-list CSV, a custom
-notification to a departure, and the audit-trail view.
+B3's tail — refunds, cancellation, amending a booking with recalculation,
+booking-list CSV, a custom notification to a departure, and the audit-trail
+view; B2's bulk departures by recurrence; group 3a's revenue-share transfer
+ledger. Ad placements were closed by the client's acceptance of the live
+Events section on the storefront.
 
 ## The showcase postcards
 

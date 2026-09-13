@@ -1612,6 +1612,9 @@ export type Database = {
           installment_reminder_days: number
           payment_window_minutes: number
           pre_departure_days: number
+          receipt_footer: string | null
+          receipt_intro: string | null
+          receipt_title: string | null
           registration_number: string | null
           social_links: Json
           statutory_notice: string | null
@@ -1631,6 +1634,9 @@ export type Database = {
           installment_reminder_days?: number
           payment_window_minutes?: number
           pre_departure_days?: number
+          receipt_footer?: string | null
+          receipt_intro?: string | null
+          receipt_title?: string | null
           registration_number?: string | null
           social_links?: Json
           statutory_notice?: string | null
@@ -1650,6 +1656,9 @@ export type Database = {
           installment_reminder_days?: number
           payment_window_minutes?: number
           pre_departure_days?: number
+          receipt_footer?: string | null
+          receipt_intro?: string | null
+          receipt_title?: string | null
           registration_number?: string | null
           social_links?: Json
           statutory_notice?: string | null
@@ -2050,6 +2059,24 @@ export type Database = {
       }
     }
     Views: {
+      customer_directory: {
+        Row: {
+          account_status: string | null
+          bookings_count: number | null
+          customer_key: string | null
+          email: string | null
+          first_booked_at: string | null
+          last_booked_at: string | null
+          lifetime_paid_base_cents: number | null
+          marketing_opt_in: boolean | null
+          name: string | null
+          phone: string | null
+          registered: boolean | null
+          since: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       package_from_price: {
         Row: {
           bookable_departures: number | null
@@ -2222,6 +2249,10 @@ export type Database = {
           p_provider_ref: string
           p_subject: string
         }
+        Returns: undefined
+      }
+      move_destination: {
+        Args: { p_id: string; p_parent: string; p_slug: string }
         Returns: undefined
       }
       next_booking_reference: { Args: never; Returns: string }

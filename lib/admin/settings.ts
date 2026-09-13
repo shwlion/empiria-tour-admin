@@ -28,6 +28,10 @@ export type PlatformSettings = {
   paymentWindowMinutes: number;
   taxRates: TaxRuleRow[];
   socialLinks: Record<string, string>;
+  /** B6: the receipt's wording around its facts (0018). Null renders the defaults. */
+  receiptTitle: string | null;
+  receiptIntro: string | null;
+  receiptFooter: string | null;
   updatedAt: string | null;
 };
 
@@ -43,6 +47,9 @@ const EMPTY: PlatformSettings = {
   paymentWindowMinutes: 60,
   taxRates: [],
   socialLinks: {},
+  receiptTitle: null,
+  receiptIntro: null,
+  receiptFooter: null,
   updatedAt: null,
 };
 
@@ -101,6 +108,9 @@ export async function getSettings(): Promise<PlatformSettings> {
     paymentWindowMinutes: data.payment_window_minutes,
     taxRates: parseTaxRules(data.tax_rates),
     socialLinks: record(data.social_links),
+    receiptTitle: data.receipt_title,
+    receiptIntro: data.receipt_intro,
+    receiptFooter: data.receipt_footer,
     updatedAt: data.updated_at,
   };
 }

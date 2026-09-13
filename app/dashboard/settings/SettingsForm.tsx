@@ -159,6 +159,23 @@ export default function SettingsForm({ settings, currencies, gaps, canEdit }: Pr
       </Card>
 
       <Card
+        title="Documents"
+        description="The wording around the facts on a receipt. The facts themselves — prices, payments, what was agreed to — are the booking's and cannot be edited; legal wording goes through a disclosure block placed on the receipt."
+      >
+        <div className="grid gap-4">
+          <Field label="Title" htmlFor="receipt_title" hint="The word in the masthead. Blank renders “Receipt”.">
+            <Input id="receipt_title" name="receipt_title" maxLength={40} defaultValue={settings.receiptTitle ?? ''} placeholder="Receipt" disabled={!canEdit} />
+          </Field>
+          <Field label="Under the masthead" htmlFor="receipt_intro" hint="A line or two: a thank-you, or where to write with a question.">
+            <Textarea id="receipt_intro" name="receipt_intro" rows={2} maxLength={400} defaultValue={settings.receiptIntro ?? ''} disabled={!canEdit} />
+          </Field>
+          <Field label="Closing note" htmlFor="receipt_footer" hint="Above the statutory notice: how to pay a balance, what to bring, who to call.">
+            <Textarea id="receipt_footer" name="receipt_footer" rows={3} maxLength={1000} defaultValue={settings.receiptFooter ?? ''} disabled={!canEdit} />
+          </Field>
+        </div>
+      </Card>
+
+      <Card
         title="Currency and timing"
         description="The hold window is how long a traveller's seats survive while they fill in the booking form. The payment window is how long they survive after the booking exists."
       >

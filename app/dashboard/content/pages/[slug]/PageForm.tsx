@@ -75,7 +75,11 @@ export default function PageForm({
             htmlFor="body"
             required
             error={err('body')}
-            hint="Plain text. Line breaks are preserved on the page."
+            hint={
+              slug === 'faq'
+                ? 'Each line starting "## " is a question; the text under it, until the next "## ", is its answer. Anything above the first question is the introduction. Answers may use **bold**, lists ("- ") and links ("[text](url)").'
+                : 'Plain text. Line breaks are preserved on the page.'
+            }
           >
             <Textarea
               id="body"

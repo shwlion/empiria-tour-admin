@@ -1830,6 +1830,47 @@ export type Database = {
           },
         ]
       }
+      saved_travellers: {
+        Row: {
+          accessibility_notes: string | null
+          created_at: string
+          date_of_birth: string | null
+          dietary_notes: string | null
+          id: string
+          legal_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accessibility_notes?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          dietary_notes?: string | null
+          id?: string
+          legal_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accessibility_notes?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          dietary_notes?: string | null
+          id?: string
+          legal_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_travellers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       showcase_cards: {
         Row: {
           created_at: string

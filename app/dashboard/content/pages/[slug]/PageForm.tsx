@@ -78,7 +78,7 @@ export default function PageForm({
             hint={
               slug === 'faq'
                 ? 'Each line starting "## " is a question; the text under it, until the next "## ", is its answer. Anything above the first question is the introduction. Answers may use **bold**, lists ("- ") and links ("[text](url)").'
-                : 'Plain text. Line breaks are preserved on the page.'
+                : 'A blank line starts a new paragraph. "## " starts a section heading, "- " a list item; **bold**, *italic* and links ("[text](url)") work too. No HTML.'
             }
           >
             <Textarea

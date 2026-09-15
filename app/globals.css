@@ -4,30 +4,32 @@
 
 /*
   Empiria Tour — Admin dashboard.
-  Design system ported from empiria-admin: a WARM parchment palette, large
-  radius (1.25rem), Empiria brand orange, Geist. Kept in parity with the admin
-  app it descends from.
+  Design system ported from empiria-admin — large radius (1.25rem), Empiria
+  brand orange, Geist. The surfaces went from that app's warm parchment to
+  neutral white on 14 Sep 2026 at the client's request ("why is it yellow"),
+  and now match the partner console's, so the two consoles read as one
+  product. The radius and the chart colours are still this app's own.
 */
 
 :root {
-  --background: oklch(0.96 0.025 85);
-  --foreground: oklch(0.18 0.01 60);
-  --card: oklch(0.98 0.02 80);
-  --card-foreground: oklch(0.18 0.01 60);
-  --popover: oklch(0.99 0.01 85);
-  --popover-foreground: oklch(0.18 0.01 60);
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.18 0.03 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.03 260);
   --primary: #f15a29; /* Empiria brand orange */
   --primary-foreground: #ffffff;
-  --secondary: oklch(0.93 0.025 80);
-  --secondary-foreground: oklch(0.28 0.01 60);
-  --muted: oklch(0.91 0.02 80);
-  --muted-foreground: oklch(0.48 0.01 60);
-  --accent: oklch(0.82 0.16 75);
-  --accent-foreground: oklch(0.22 0.02 60);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.89 0.02 80);
-  --input: oklch(0.93 0.02 80);
+  --secondary: oklch(0.96 0.005 260);
+  --secondary-foreground: oklch(0.25 0.04 260);
+  --muted: oklch(0.955 0.005 260);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.94 0.01 260);
+  --accent-foreground: oklch(0.25 0.04 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.915 0.005 260);
+  --input: oklch(0.915 0.005 260);
   --ring: #f15a29;
   --chart-1: #f15a29;
   --chart-2: oklch(0.22 0.01 60);
@@ -35,14 +37,14 @@
   --chart-4: oklch(0.65 0.1 270);
   --chart-5: oklch(0.7 0.08 45);
   --radius: 1.25rem;
-  --sidebar: oklch(0.98 0.02 80);
-  --sidebar-foreground: oklch(0.18 0.01 60);
-  --sidebar-primary: oklch(0.82 0.16 75);
-  --sidebar-primary-foreground: oklch(0.22 0.02 60);
-  --sidebar-accent: oklch(0.93 0.025 80);
-  --sidebar-accent-foreground: oklch(0.18 0.01 60);
-  --sidebar-border: oklch(0.89 0.02 80);
-  --sidebar-ring: oklch(0.82 0.16 75);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.18 0.03 260);
+  --sidebar-primary: #f15a29;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: oklch(0.94 0.01 260);
+  --sidebar-accent-foreground: oklch(0.25 0.04 260);
+  --sidebar-border: oklch(0.915 0.005 260);
+  --sidebar-ring: #f15a29;
 }
 
 @theme inline {

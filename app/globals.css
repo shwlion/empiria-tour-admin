@@ -97,20 +97,6 @@
   }
 }
 
-/* TopNav: horizontal pill strip, horizontally scrollable when it overflows. */
-.topnav-links {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.topnav-links::-webkit-scrollbar {
-  display: none;
-}
 
 /* The console's ground: white, with the Events admin's orange glow bleeding
    in from the right edge — copied verbatim from that app's dashboard layout at

@@ -31,11 +31,10 @@ import type { Capabilities, Role } from '@/lib/auth';
  * that nine times over was the overflow); the row WRAPS rather than scrolls,
  * so a section that does not fit drops to a second line instead of vanishing;
  * the name block waits for lg; and below md the sections live behind a menu
- * button, as the Events admin keeps them in a drawer. The active pill is
- * amber (#ffb330 — the accent this console carried before its surfaces went
- * white, oklch(0.82 0.16 75)) on dark text, at the client's request; the
- * white pill it replaced had been invisible since the ground went white, and
- * the dark one that briefly followed read as black.
+ * button, as the Events admin keeps them in a drawer. The active pill is the
+ * brand orange — `bg-primary`, the same as every button on the platform — at
+ * the client's request, after a white one (invisible once the ground went
+ * white), a dark one (read as black) and an amber one (not the brand).
  */
 
 type NavItem = {
@@ -121,7 +120,7 @@ export default function TopNav({
   const pill = (active: boolean) =>
     `inline-flex items-center rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
       active
-        ? 'bg-[#ffb330] font-semibold text-[#1a1209]'
+        ? 'bg-primary font-semibold text-white'
         : 'font-medium text-muted-foreground hover:bg-white/70 hover:text-foreground'
     }`;
 
@@ -211,7 +210,7 @@ export default function TopNav({
                   aria-current={active ? 'page' : undefined}
                   className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[14px] transition-colors ${
                     active
-                      ? 'bg-[#ffb330] font-semibold text-[#1a1209]'
+                      ? 'bg-primary font-semibold text-white'
                       : 'font-medium text-foreground hover:bg-white/70'
                   }`}
                 >

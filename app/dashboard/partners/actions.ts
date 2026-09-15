@@ -8,6 +8,10 @@ import { recordAudit } from '@/lib/audit';
 import { explain, fail, ok, text, type ActionResult } from '@/lib/actions';
 import { approvalPlan, getApplication } from '@/lib/admin/partners';
 
+// Where an approved partner signs in. The same PARTNER_URL the invitation's
+// redirect uses; the default is the production console.
+const PARTNER_URL = (process.env.PARTNER_URL || 'https://partners.empiria.events').replace(/\/$/, '');
+
 /**
  * Deciding a partner application.
  *
@@ -33,7 +37,7 @@ async function inviteAccount(email: string, fullName: string): Promise<string> {
   if (!url || !key) throw new Error('SUPABASE_KEY is not set, so no account can be created.');
 
   const auth = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-  const redirectTo = process.env.PARTNER_URL ? `${process.env.PARTNER_URL}/dashboard` : undefined;
+  const redirectTo = `${PARTNER_URL}/dashboard`;
 
   const { data, error } = await auth.auth.admin.inviteUserByEmail(email, {
     data: { full_name: fullName },
@@ -90,7 +94,7 @@ export async function approveApplicationAction(
         to_email: app.email,
         to_name: app.contactName,
         dedupe_key: `partner_approved:${applicationId}`,
-        merge_data: { 'traveller.name': app.contactName, 'company.name': app.companyName },
+        merge_data: { 'applicant.name': app.contactName, 'applicant.company': app.companyName, 'partner.console_link': PARTNER_URL },
       } as never,
     });
 
@@ -147,9 +151,9 @@ export async function declineApplicationAction(
         to_name: app.contactName,
         dedupe_key: `partner_declined:${applicationId}`,
         merge_data: {
-          'traveller.name': app.contactName,
-          'company.name': app.companyName,
-          'departure.reason': note,
+          'applicant.name': app.contactName,
+          'applicant.company': app.companyName,
+          'application.note': note,
         },
       } as never,
     });

@@ -173,6 +173,12 @@ export const MERGE_FIELDS: Record<string, string[]> = {
   refund_issued: ['booking.reference', 'payment.amount', 'traveller.name', 'package.title', 'payment.method'],
   account_created: ['traveller.name', 'account.email', 'account.confirm_link'],
   admin_alert: ['booking.reference', 'booking.total', 'traveller.name', 'package.title', 'departure.date', 'booking.admin_link'],
+  installment_due: ['booking.reference', 'installment.number', 'installment.of', 'installment.amount', 'installment.due_on', 'installment.remaining', 'traveller.name', 'package.title', 'departure.date', 'payment.link'],
+  installment_paid: ['booking.reference', 'installment.number', 'installment.of', 'payment.amount', 'installment.remaining', 'traveller.name', 'package.title', 'departure.date'],
+  partner_application_received: ['applicant.name', 'applicant.company'],
+  partner_application_approved: ['applicant.name', 'applicant.company', 'partner.console_link'],
+  partner_application_declined: ['applicant.name', 'applicant.company', 'application.note'],
+  partner_application_alert: ['applicant.name', 'applicant.company', 'application.admin_link'],
 };
 
 /** When each one is sent, in the words of somebody deciding what it should say. */
@@ -188,6 +194,12 @@ export const TEMPLATE_TRIGGERS: Record<string, string> = {
   refund_issued: 'A refund is sent back to the original card.',
   account_created: 'Somebody signs up.',
   admin_alert: 'A new booking arrives, sent to Empiria rather than the traveller.',
+  installment_due: 'Ahead of an installment date, once installments exist.',
+  installment_paid: 'An installment clears, once installments exist.',
+  partner_application_received: 'A tour operator applies to sell through Empiria.',
+  partner_application_approved: 'Empiria approves the application; the console is theirs.',
+  partner_application_declined: 'Empiria declines the application, with a note.',
+  partner_application_alert: 'A tour operator applies — sent to Empiria, not the applicant.',
 };
 
 export type EmailTemplate = {

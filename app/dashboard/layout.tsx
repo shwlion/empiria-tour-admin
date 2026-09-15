@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const pendingPartners = user.can.manageSettings ? await countPending() : 0;
 
   return (
-    <div className="min-h-screen">
+    <div className="console-glow min-h-screen">
       <TopNav
         name={user.name}
         email={user.email}

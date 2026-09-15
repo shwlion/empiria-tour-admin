@@ -112,6 +112,23 @@
   display: none;
 }
 
+/* The console's ground: white, with the Events admin's orange glow bleeding
+   in from the right edge — copied verbatim from that app's dashboard layout at
+   the client's request (14 Sep 2026). The frosted top nav lets it through
+   softly. Anchored at 98% 50% of the shell, so on a tall page the glow
+   stretches with it rather than sitting only in the first viewport. */
+.console-glow {
+  background: radial-gradient(
+    ellipse 75% 65% at 98% 50%,
+    #ff7a1a 0%,
+    #ffb06a 18%,
+    #ffd9aa 36%,
+    #ffeedd 54%,
+    #fff6ee 70%,
+    #ffffff 100%
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

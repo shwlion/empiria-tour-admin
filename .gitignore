@@ -27,3 +27,4 @@ next-env.d.ts
 
 # Sandbox cannot delete; retired files land here.
 _to_delete/
+.vercel

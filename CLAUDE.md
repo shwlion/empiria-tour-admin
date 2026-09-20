@@ -1,7 +1,7 @@
 # Empiria Tours — admin console
 
 Empiria's own console (Exhibit A **Part B**). One of three separate repositories
-sharing one Supabase project, all under `~/Documents/Elevsoft/Empiria Tours/` —
+sharing one Supabase project, all under `~/dev/Elevsoft/Empiria Tours/` —
 **that path contains a space**, so quote it.
 
 | Repo | Dev port |
@@ -114,7 +114,7 @@ best-effort. Losing the record of a change is bad; losing the change is worse.
 ## Working in here
 
 ```bash
-cd "~/Documents/Elevsoft/Empiria Tours/empiria-tour-admin"
+cd "~/dev/Elevsoft/Empiria Tours/empiria-tour-admin"
 bun install
 bun dev                                  # 3001
 npx tsc --noEmit && npx eslint . --max-warnings=0

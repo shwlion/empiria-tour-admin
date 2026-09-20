@@ -1616,6 +1616,8 @@ export type Database = {
           receipt_intro: string | null
           receipt_title: string | null
           registration_number: string | null
+          showcase_promoted_label: string | null
+          showcase_rate_cents_per_week: number
           social_links: Json
           statutory_notice: string | null
           tax_rates: Json
@@ -1638,6 +1640,8 @@ export type Database = {
           receipt_intro?: string | null
           receipt_title?: string | null
           registration_number?: string | null
+          showcase_promoted_label?: string | null
+          showcase_rate_cents_per_week?: number
           social_links?: Json
           statutory_notice?: string | null
           tax_rates?: Json
@@ -1660,6 +1664,8 @@ export type Database = {
           receipt_intro?: string | null
           receipt_title?: string | null
           registration_number?: string | null
+          showcase_promoted_label?: string | null
+          showcase_rate_cents_per_week?: number
           social_links?: Json
           statutory_notice?: string | null
           tax_rates?: Json
@@ -1889,6 +1895,8 @@ export type Database = {
           image_url: string
           kicker: string
           link_url: string
+          rate_cents_per_week: number | null
+          sellable: boolean
           sort_order: number
           status: string
           title: string
@@ -1903,6 +1911,8 @@ export type Database = {
           image_url: string
           kicker?: string
           link_url?: string
+          rate_cents_per_week?: number | null
+          sellable?: boolean
           sort_order?: number
           status?: string
           title: string
@@ -1917,6 +1927,8 @@ export type Database = {
           image_url?: string
           kicker?: string
           link_url?: string
+          rate_cents_per_week?: number | null
+          sellable?: boolean
           sort_order?: number
           status?: string
           title?: string
@@ -1927,6 +1939,103 @@ export type Database = {
           {
             foreignKeyName: "showcase_cards_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      showcase_placements: {
+        Row: {
+          card_id: string
+          checkout_ref: string | null
+          created_at: string
+          currency: string
+          decided_at: string | null
+          decided_by: string | null
+          description: string
+          ends_on: string
+          hold_until: string | null
+          id: string
+          image_alt: string
+          image_url: string
+          kicker: string
+          link_url: string
+          note: string | null
+          paid_at: string | null
+          partner_id: string
+          price_cents: number | null
+          starts_on: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          card_id: string
+          checkout_ref?: string | null
+          created_at?: string
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          description: string
+          ends_on: string
+          hold_until?: string | null
+          id?: string
+          image_alt?: string
+          image_url: string
+          kicker?: string
+          link_url?: string
+          note?: string | null
+          paid_at?: string | null
+          partner_id: string
+          price_cents?: number | null
+          starts_on: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          card_id?: string
+          checkout_ref?: string | null
+          created_at?: string
+          currency?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          description?: string
+          ends_on?: string
+          hold_until?: string | null
+          id?: string
+          image_alt?: string
+          image_url?: string
+          kicker?: string
+          link_url?: string
+          note?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          price_cents?: number | null
+          starts_on?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "showcase_placements_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "showcase_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "showcase_placements_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "showcase_placements_partner_id_fkey"
+            columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -2324,6 +2433,7 @@ export type Database = {
         Args: { p_actor: string; p_status: string; p_user: string }
         Returns: undefined
       }
+      showcase_rate_cents: { Args: { p_card: string }; Returns: number }
       submit_partner_application: { Args: { p_payload: Json }; Returns: string }
     }
     Enums: {

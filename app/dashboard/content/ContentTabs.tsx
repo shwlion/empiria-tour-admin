@@ -10,6 +10,9 @@ const TABS = [
   { name: 'Disclosures', href: '/dashboard/content/disclosures' },
   { name: 'Emails', href: '/dashboard/content/emails' },
   { name: 'Showcase', href: '/dashboard/content/showcase' },
+  // Next to Showcase because it decides what those same four postcards say:
+  // Showcase is Empiria's own content, Promotions is a partner's, bought.
+  { name: 'Promotions', href: '/dashboard/content/placements' },
   { name: 'Blog', href: '/dashboard/content/blog' },
 ];
 

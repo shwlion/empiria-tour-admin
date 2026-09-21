@@ -189,6 +189,35 @@ export default function SettingsForm({ settings, currencies, gaps, canEdit }: Pr
               ))}
             </Select>
           </Field>
+          {/* Migration 0021: what a partner pays to put their own words on one
+              of the landing page's four postcards. Zero means no rate is
+              published, so nothing can be quoted — which the Promotions queue
+              says out loud rather than offering to approve a free placement. */}
+          <Field
+            label="Postcard rate (per week)"
+            htmlFor="showcase_rate_cents_per_week"
+            hint="What a partner pays to promote on the landing page. A card may override it. Zero means not for sale."
+          >
+            <Input
+              id="showcase_rate_cents_per_week"
+              name="showcase_rate_cents_per_week"
+              inputMode="decimal"
+              defaultValue={(settings.showcaseRateCentsPerWeek / 100).toFixed(2)}
+            />
+          </Field>
+          <Field
+            label="Promoted-card wording"
+            htmlFor="showcase_promoted_label"
+            hint="Shown on a card a partner has paid for, if disclosure is required. Empiria decides the wording; blank shows nothing."
+            className="sm:col-span-2"
+          >
+            <Input
+              id="showcase_promoted_label"
+              name="showcase_promoted_label"
+              placeholder="e.g. Promoted"
+              defaultValue={settings.showcasePromotedLabel ?? ''}
+            />
+          </Field>
           <Field
             label="Hold window (minutes)"
             htmlFor="hold_minutes"

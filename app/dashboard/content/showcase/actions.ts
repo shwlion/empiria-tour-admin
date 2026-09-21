@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
-import { explain, fail, ok, text, type ActionResult, type FieldErrors } from '@/lib/actions';
+import { cents, checkbox, explain, fail, ok, text, type ActionResult, type FieldErrors } from '@/lib/actions';
 import { SHOWCASE_LIMITS as LIMITS } from '@/lib/admin/content';
 
 /**
@@ -82,6 +82,13 @@ export async function saveShowcaseCardAction(
   const linkUrl = text(form.get('link_url')) || '/tours';
   const status = text(form.get('status')) === 'published' ? 'published' : 'draft';
 
+  // Migration 0021: whether a partner may buy this slot, and what it costs.
+  // An empty rate is null, not zero — null falls back to the platform rate,
+  // whereas zero would quote a partner nothing and read as a free card.
+  const sellable = checkbox(form.get('sellable'));
+  const rateRaw = text(form.get('rate_cents_per_week'));
+  const rateCentsPerWeek = rateRaw === '' ? null : cents(form.get('rate_cents_per_week'));
+
   const fields: FieldErrors = {};
   if (!title) fields.title = 'Required';
   else if (title.length > LIMITS.title) fields.title = `At most ${LIMITS.title} characters`;
@@ -96,6 +103,16 @@ export async function saveShowcaseCardAction(
   const link = storefrontPath(linkUrl) ?? '';
   if (!link) fields.link_url = 'A path on the storefront, beginning with a single slash — not a full address';
 
+  if (rateCentsPerWeek != null && rateCentsPerWeek < 0) {
+    fields.rate_cents_per_week = 'Zero or more';
+  }
+  // A draft card cannot be sold: it is not on the landing page, so a partner
+  // would be buying a slot nobody sees. Refused here rather than silently
+  // unticked, because silently undoing somebody's choice is worse.
+  if (sellable && status !== 'published') {
+    fields.sellable = 'Publish the card first';
+  }
+
   if (Object.keys(fields).length) return fail('Check the highlighted fields.', fields);
 
   const content = {
@@ -106,6 +123,8 @@ export async function saveShowcaseCardAction(
     image_alt: imageAlt,
     link_url: link,
     status,
+    sellable,
+    rate_cents_per_week: rateCentsPerWeek,
   };
   // updated_at is the trigger's job (0012); only the actor is ours to record.
   const row = { ...content, updated_by: user.id };

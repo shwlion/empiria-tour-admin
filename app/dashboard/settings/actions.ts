@@ -57,6 +57,10 @@ export async function saveSettingsAction(
 
   const holdMinutes = integer(form.get('hold_minutes'), 20);
   const paymentWindow = integer(form.get('payment_window_minutes'), 60);
+  // 0021. Zero is meaningful: it means no rate is published, so nothing
+  // can be quoted and the Promotions queue says so rather than offering
+  // to approve a placement at nothing.
+  const showcaseRate = cents(form.get('showcase_rate_cents_per_week'), 0);
   if (holdMinutes < 1) return fail('The hold window must be at least a minute.', { hold_minutes: 'Too short' });
   if (paymentWindow < 1) {
     return fail('The payment window must be at least a minute.', { payment_window_minutes: 'Too short' });
@@ -87,6 +91,8 @@ export async function saveSettingsAction(
     default_currency: text(form.get('default_currency')) || 'CAD',
     hold_minutes: holdMinutes,
     payment_window_minutes: paymentWindow,
+    showcase_rate_cents_per_week: Math.max(0, showcaseRate),
+    showcase_promoted_label: nullable(form.get('showcase_promoted_label')),
     tax_rates: rules,
     receipt_title: nullable(form.get('receipt_title')),
     receipt_intro: nullable(form.get('receipt_intro')),

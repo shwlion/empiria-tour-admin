@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Badge, Banner, Button, Card, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
+import { Badge, Banner, Button, Card, Checkbox, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import { SHOWCASE_LIMITS as LIMITS, SHOWCASE_SLOTS, type ShowcaseCardRecord } from '@/lib/admin/content';
 import {
@@ -338,6 +338,41 @@ function CardForm({ card, onDone }: { card: ShowcaseCardRecord | null; onDone: (
                 <option value="published">Published — on the landing page</option>
               </Select>
             </Field>
+
+            {/* Migration 0021. A slot a partner can buy for a run of days:
+                their photograph and words stand in this card's place for the
+                window they paid for, and it falls back to this one outside it.
+                Off by default — putting Empiria's own card on the market is a
+                deliberate act, not something a new column does quietly. */}
+            <div className="rounded-lg border border-border bg-background p-3">
+              <Checkbox
+                id="sellable"
+                name="sellable"
+                defaultChecked={card?.sellable ?? false}
+                label="Partners may buy this slot"
+                hint="Requests appear under Content → Promotions, where you set the price and approve."
+              />
+              <div className="mt-3">
+                <Field
+                  label="Rate for this card"
+                  htmlFor="rate_cents_per_week"
+                  hint="Per week. Leave empty to use the platform rate in Settings."
+                  error={err('rate_cents_per_week')}
+                >
+                  <Input
+                    id="rate_cents_per_week"
+                    name="rate_cents_per_week"
+                    inputMode="decimal"
+                    placeholder="Platform rate"
+                    defaultValue={card?.rateCentsPerWeek != null ? (card.rateCentsPerWeek / 100).toFixed(2) : ''}
+                    error={Boolean(err('rate_cents_per_week'))}
+                  />
+                </Field>
+              </div>
+              {err('sellable') && (
+                <p className="mt-2 text-[12px] font-medium text-destructive">{err('sellable')}</p>
+              )}
+            </div>
           </div>
         </div>
       </Card>

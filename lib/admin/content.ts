@@ -272,12 +272,17 @@ export type ShowcaseCardRecord = {
   linkUrl: string;
   sortOrder: number;
   status: 'draft' | 'published';
+  /** Whether a partner may buy this slot (migration 0021). */
+  sellable: boolean;
+  /** This card's own weekly rate, or null to use the platform's. */
+  rateCentsPerWeek: number | null;
   updatedAt: string;
 };
 
 function toShowcaseCard(r: {
   id: string; title: string; kicker: string; description: string; image_url: string;
   image_alt: string; link_url: string; sort_order: number; status: string; updated_at: string;
+  sellable?: boolean; rate_cents_per_week?: number | null;
 }): ShowcaseCardRecord {
   return {
     id: r.id,
@@ -288,6 +293,8 @@ function toShowcaseCard(r: {
     imageAlt: r.image_alt,
     linkUrl: r.link_url,
     sortOrder: r.sort_order,
+    sellable: r.sellable ?? false,
+    rateCentsPerWeek: r.rate_cents_per_week ?? null,
     // The database constrains it to these two; narrowing here keeps the
     // editor's Publish/Unpublish switch honest without a cast at each use.
     status: r.status === 'published' ? 'published' : 'draft',

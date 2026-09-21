@@ -25,6 +25,10 @@ export type PlatformSettings = {
   contactAddress: Record<string, string>;
   defaultCurrency: string;
   holdMinutes: number;
+  /** Migration 0021: the published weekly rate for a landing-page postcard. */
+  showcaseRateCentsPerWeek: number;
+  /** §2.3: the wording a promoted card carries, if Empiria requires one. */
+  showcasePromotedLabel: string | null;
   paymentWindowMinutes: number;
   taxRates: TaxRuleRow[];
   socialLinks: Record<string, string>;
@@ -44,6 +48,8 @@ const EMPTY: PlatformSettings = {
   contactAddress: {},
   defaultCurrency: 'CAD',
   holdMinutes: 20,
+  showcaseRateCentsPerWeek: 0,
+  showcasePromotedLabel: null,
   paymentWindowMinutes: 60,
   taxRates: [],
   socialLinks: {},
@@ -105,6 +111,8 @@ export async function getSettings(): Promise<PlatformSettings> {
     contactAddress: record(data.contact_address),
     defaultCurrency: data.default_currency,
     holdMinutes: data.hold_minutes,
+    showcaseRateCentsPerWeek: data.showcase_rate_cents_per_week ?? 0,
+    showcasePromotedLabel: data.showcase_promoted_label ?? null,
     paymentWindowMinutes: data.payment_window_minutes,
     taxRates: parseTaxRules(data.tax_rates),
     socialLinks: record(data.social_links),

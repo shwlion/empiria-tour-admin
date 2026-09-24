@@ -87,7 +87,7 @@ export const PLACEMENTS: { value: string; label: string; where: string }[] = [
   { value: 'booking_additional', label: 'Booking · Extras', where: 'Step 2, alongside rooms and add-ons.' },
   { value: 'booking_review', label: 'Booking · Review', where: 'Step 3, beside the itemised total.' },
   { value: 'booking_terms', label: 'Booking · Terms', where: 'Step 4. The last thing before places are reserved.' },
-  { value: 'booking_payment', label: 'Booking · Payment', where: 'Step 5, on the payment page.' },
+  { value: 'booking_payment', label: 'Booking · Payment', where: 'With the terms in step 4, before places are reserved and payment is taken.' },
   { value: 'receipt', label: 'Receipts', where: 'On the receipt document.' },
   { value: 'email_confirmation', label: 'Confirmation email', where: 'In the booking confirmation.' },
   { value: 'footer', label: 'Site footer', where: 'Every page of the public site.' },

@@ -236,7 +236,7 @@ export async function unfinishedPlacements(): Promise<PlacementRecord[]> {
   return ((data ?? []) as unknown as PlacementJoined[]).map(toPlacement);
 }
 
-/** Cards that may be sold at all, with the rate each would quote. */
+/** Every card, with whether it is for sale and the rate each would quote. */
 export type SellableCard = {
   id: string;
   title: string;
@@ -245,26 +245,56 @@ export type SellableCard = {
   /** The card's own rate, or null when it falls back to the platform's. */
   rateCentsPerWeek: number | null;
   effectiveRateCentsPerWeek: number;
+  /** Among the first four published — all the landing page shows. */
+  onLandingPage: boolean;
+  /**
+   * Whether partners are actually offered it: sellable, on the landing page,
+   * and priced above zero. The partner dashboard's `listOfferedCards` applies
+   * the same three conditions, and the two must be kept in step by hand — a
+   * console that counts a card as for sale while partners are shown nothing
+   * has Empiria waiting for requests nobody can make.
+   */
+  offered: boolean;
 };
+
+type CardRow = {
+  id: string; title: string; status: string; sort_order: number;
+  sellable: boolean; rate_cents_per_week: number | null;
+};
+
+/** The sale terms of every card, from the deck in the storefront's order. */
+export function toSellableCards(deck: CardRow[], defaultRateCents: number): SellableCard[] {
+  const shown = shownOnLandingPage(deck);
+  return deck.map((c) => {
+    const effectiveRateCentsPerWeek = c.rate_cents_per_week ?? defaultRateCents;
+    const onLandingPage = shown.has(c.id);
+    return {
+      id: c.id,
+      title: c.title,
+      sortOrder: c.sort_order,
+      sellable: c.sellable,
+      rateCentsPerWeek: c.rate_cents_per_week,
+      effectiveRateCentsPerWeek,
+      onLandingPage,
+      offered: c.sellable && onLandingPage && effectiveRateCentsPerWeek > 0,
+    };
+  });
+}
 
 export async function listSellableCards(): Promise<{ cards: SellableCard[]; defaultRateCents: number; currency: string }> {
   const db = getSupabaseAdmin();
   if (!db) return { cards: [], defaultRateCents: 0, currency: 'CAD' };
   const [cardsRes, settingsRes] = await Promise.all([
-    db.from('showcase_cards').select('id, title, sort_order, sellable, rate_cents_per_week').order('sort_order'),
+    db
+      .from('showcase_cards')
+      .select('id, title, status, sort_order, sellable, rate_cents_per_week')
+      .order('sort_order')
+      .order('created_at'),
     db.from('platform_settings').select('showcase_rate_cents_per_week, default_currency').eq('id', true).maybeSingle(),
   ]);
   const defaultRateCents = settingsRes.data?.showcase_rate_cents_per_week ?? 0;
   const currency = settingsRes.data?.default_currency ?? 'CAD';
-  const cards = (cardsRes.data ?? []).map((c) => ({
-    id: c.id,
-    title: c.title,
-    sortOrder: c.sort_order,
-    sellable: c.sellable,
-    rateCentsPerWeek: c.rate_cents_per_week,
-    effectiveRateCentsPerWeek: c.rate_cents_per_week ?? defaultRateCents,
-  }));
-  return { cards, defaultRateCents, currency };
+  return { cards: toSellableCards(cardsRes.data ?? [], defaultRateCents), defaultRateCents, currency };
 }
 
 /**

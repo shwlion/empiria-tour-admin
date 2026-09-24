@@ -18,11 +18,13 @@ export const metadata: Metadata = { title: 'Promotions · Empiria Tour Admin' };
  *
  * Two conditions are surfaced rather than left to be discovered:
  *
- *   - No rate set. With the platform rate at zero nothing can be quoted, so
- *     the page says so instead of offering to approve at $0.00.
  *   - No sellable cards. Every card is `sellable = false` until somebody says
  *     otherwise, which is deliberate — but it also means partners cannot ask
  *     for anything, and an empty queue would otherwise look like no demand.
+ *   - A card marked sellable that partners are not offered, and why: it is not
+ *     on the landing page (a draft, or past the fourth published card), or
+ *     its rate comes to zero, so nothing can be quoted. "For sale" here means
+ *     what the partner dashboard offers, not what the checkbox says.
  *
  * A queue that could not be read says so, for the same reason: it once
  * showed "No requests yet" to every administrator while partners' requests
@@ -37,7 +39,10 @@ export default async function PlacementsPage() {
   const placements = read ?? [];
   const today = todayInSellerCalendar();
 
-  const sellable = cards.filter((c) => c.sellable);
+  const marked = cards.filter((c) => c.sellable);
+  const offered = cards.filter((c) => c.offered);
+  const withheld = marked.filter((c) => !c.offered);
+  const shown = cards.filter((c) => c.onLandingPage).length;
   const pending = placements.filter((p) => p.status === 'requested');
   const money = (c: number) => formatPrice(c, currency);
 
@@ -61,17 +66,25 @@ export default async function PlacementsPage() {
         description="Partners buying a landing-page postcard. Approve one and it holds those days; the partner pays, and their card runs for the window they bought."
       />
 
-      {sellable.length === 0 && (
+      {marked.length === 0 && (
         <Banner tone="info">
           None of the four postcards is for sale yet, so partners cannot request one. Mark a card
           sellable under Content → Showcase.
         </Banner>
       )}
 
-      {sellable.length > 0 && defaultRateCents === 0 && cards.every((c) => c.rateCentsPerWeek == null) && (
+      {withheld.length > 0 && (
         <Banner tone="info">
-          No weekly rate is set, so nothing can be quoted. Set one under Settings, or give a card its
-          own rate under Content → Showcase.
+          Marked for sale, but not offered to partners:{' '}
+          {withheld.map((c, i) => (
+            <span key={c.id}>
+              {i > 0 && '; '}“{c.title}”{' '}
+              {c.onLandingPage
+                ? 'has no weekly rate, so nothing can be quoted — give it one under Content → Showcase, or set the platform rate under Settings'
+                : 'is not on the landing page — it is a draft, or past the fourth published postcard'}
+            </span>
+          ))}
+          .
         </Banner>
       )}
 
@@ -90,7 +103,8 @@ export default async function PlacementsPage() {
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-[12px] font-medium text-muted-foreground">Cards for sale</p>
           <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-foreground">
-            {sellable.length} <span className="text-[13px] font-normal text-muted-foreground">of {cards.length}</span>
+            {offered.length}{' '}
+            <span className="text-[13px] font-normal text-muted-foreground">of {shown} on the landing page</span>
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
@@ -107,8 +121,8 @@ export default async function PlacementsPage() {
           <EmptyState
             title="No requests yet"
             description={
-              sellable.length === 0
-                ? 'Mark a postcard sellable and partners will be able to ask for it.'
+              offered.length === 0
+                ? 'Put a postcard on sale — sellable, on the landing page, with a rate — and partners will be able to ask for it.'
                 : 'Partners can request a postcard from their dashboard. Anything they ask for lands here.'
             }
           />

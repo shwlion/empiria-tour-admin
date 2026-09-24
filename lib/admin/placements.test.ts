@@ -1,4 +1,4 @@
-import { placementsCutBy, shownOnLandingPage, todayInSellerCalendar, type PlacementRecord } from './placements';
+import { placementsCutBy, shownOnLandingPage, todayInSellerCalendar, toSellableCards, type PlacementRecord } from './placements';
 
 /**
  * The paid postcards' calendar arithmetic.
@@ -55,6 +55,26 @@ eq('bringing a sold card back onto the page is allowed', placementsCutBy(
   [card('A'), card('B'), card('C'), card('E'), card('D', 'draft')],
   [held('E')]
 ).map((p) => p.cardId), []);
+
+// ── what counts as for sale ─────────────────────────────────────────────────
+// The audit's case: card 1 was sellable and then unpublished; card 3 is
+// sellable at its own rate of 0.00. The platform rate is $100. Partners are
+// offered neither, so the console must not count either.
+const row = (id: string, o: { status?: string; sellable?: boolean; rate?: number | null } = {}) => ({
+  id, title: id, status: o.status ?? 'published', sort_order: Number(id.slice(1)),
+  sellable: o.sellable ?? false, rate_cents_per_week: o.rate === undefined ? null : o.rate,
+});
+const terms = toSellableCards(
+  [row('c1', { status: 'draft', sellable: true }), row('c2'), row('c3', { sellable: true, rate: 0 }), row('c4'), row('c5', { sellable: true }), row('c6', { sellable: true })],
+  10000
+);
+const pick = (id: string) => terms.find((t) => t.id === id)!;
+eq('an unpublished sellable card is not offered', [pick('c1').onLandingPage, pick('c1').offered], [false, false]);
+eq('a card at its own rate of zero is not offered, whatever the platform rate', [pick('c3').effectiveRateCentsPerWeek, pick('c3').offered], [0, false]);
+eq('a sellable card on the page at the platform rate is offered', [pick('c5').onLandingPage, pick('c5').effectiveRateCentsPerWeek, pick('c5').offered], [true, 10000, true]);
+eq('a sellable card past the fourth published is not offered', [pick('c6').onLandingPage, pick('c6').offered], [false, false]);
+eq('so the console counts one card for sale, as partners see it', terms.filter((t) => t.offered).map((t) => t.id), ['c5']);
+eq('and no platform rate means nothing is offered', toSellableCards([row('c1', { sellable: true })], 0).map((t) => t.offered), [false]);
 
 if (failed) {
   console.log(`\n${failed} FAILED`);

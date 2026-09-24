@@ -56,6 +56,10 @@ export function CollectionForm({ collection, packages }: { collection: Collectio
 
       <Card title="Tours in it" description={packages.length === 0 ? 'No tours to choose from yet.' : 'Tick the tours that belong. Members are listed first, in their current order; a draft tour can be a member but only shows once it is published.'}>
         <div className="grid gap-2 sm:grid-cols-2">
+          {/* What this form showed, so the action unticks only those. */}
+          {ordered.map((p) => (
+            <input key={`offered-${p.id}`} type="hidden" name="package_offered" value={p.id} />
+          ))}
           {ordered.map((p) => (
             <Checkbox
               key={p.id}

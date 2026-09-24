@@ -128,6 +128,10 @@ export function PromotionForm({
           <p className="text-[13px] text-muted-foreground">There are no tours yet.</p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
+            {/* What this form showed, so the action unticks only those. */}
+            {packages.map((p) => (
+              <input key={`offered-${p.id}`} type="hidden" name="package_offered" value={p.id} />
+            ))}
             {packages.map((p) => (
               <Checkbox
                 key={p.id}

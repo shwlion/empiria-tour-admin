@@ -81,10 +81,14 @@ export async function saveCollectionAction(
       if (error) throw error;
     }
 
-    // Reconcile membership: remove what is no longer ticked, upsert the rest with its order.
+    // Reconcile membership: remove what is no longer ticked, upsert the rest
+    // with its order. Only a tour the form showed can be unticked: an archived
+    // member is left out of the form, and dropping it here would lose its place
+    // on the shelf for when it comes back.
+    const offered = new Set(form.getAll('package_offered').map(String));
     const { data: existing } = await db.from('package_collections').select('package_id').eq('collection_id', collectionId);
     const had = new Set(((existing ?? []) as { package_id: string }[]).map((l) => l.package_id));
-    const gone = [...had].filter((p) => !members.includes(p));
+    const gone = [...had].filter((p) => !members.includes(p) && offered.has(p));
     if (gone.length) {
       const { error } = await db.from('package_collections').delete().eq('collection_id', collectionId).in('package_id', gone);
       if (error) throw error;

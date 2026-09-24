@@ -116,11 +116,16 @@ export async function savePromotionAction(
       }
 
       // Scope is reconciled, not replaced: only the rows that actually change
-      // are written, so a save that touched nothing writes nothing.
+      // are written, so a save that touched nothing writes nothing. And only a
+      // tour the form showed can be unticked. One it never offered — archived
+      // since, or missing from a page opened before — keeps its scope, because
+      // no rows at all means every tour (check_promotion): dropping the last
+      // one would quietly widen the code to the whole catalogue.
+      const offered = new Set(form.getAll('package_offered').map(String));
       const had = new Set(existing.scope.map((s) => s.id));
       const want = new Set(draft.packageIds);
       const add = [...want].filter((p) => !had.has(p));
-      const remove = [...had].filter((p) => !want.has(p));
+      const remove = [...had].filter((p) => !want.has(p) && offered.has(p));
       if (add.length) {
         const { error } = await db
           .from('promotion_packages')

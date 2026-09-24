@@ -12,6 +12,7 @@ import {
   listPackageChoices,
   usageLabel,
   validityLabel,
+  withScopedTours,
 } from '@/lib/admin/promotions';
 import { DeleteForm, PromotionForm, StatusForm } from '../PromotionForms';
 
@@ -59,7 +60,7 @@ export default async function PromotionPage({ params }: { params: Promise<{ id: 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card title="Details">
-            <PromotionForm promotion={promotion} packages={packages} currencies={currencies} />
+            <PromotionForm promotion={promotion} packages={withScopedTours(packages, promotion.scope)} currencies={currencies} />
           </Card>
         </div>
 

@@ -128,6 +128,18 @@ export async function listPackageChoices(): Promise<PackageChoice[]> {
   return (data ?? []).map((p) => ({ id: p.id, title: p.title, status: p.status }));
 }
 
+/**
+ * The tours one code's form lists: the choices, plus any tour the code is
+ * scoped to that is no longer among them — archived since. Listed, and so
+ * ticked, because the form is where somebody reads what a code is limited to:
+ * left out, a code scoped only to archived tours would read as good on every
+ * tour, the very thing its scope says it is not.
+ */
+export function withScopedTours(choices: PackageChoice[], scope: { id: string; title: string }[]): PackageChoice[] {
+  const missing = scope.filter((s) => !choices.some((c) => c.id === s.id));
+  return [...choices, ...missing.map((s) => ({ id: s.id, title: s.title, status: 'archived' }))];
+}
+
 export async function listCurrencyCodes(): Promise<string[]> {
   const db = getSupabaseAdmin();
   if (!db) return ['CAD'];

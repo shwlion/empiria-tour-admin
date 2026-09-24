@@ -66,7 +66,14 @@ export async function saveBlogPostAction(
       return ok({ id: data.id }, 'Saved as a draft.');
     }
 
-    const { data: before } = await db.from('blog_posts').select('*').eq('id', id).maybeSingle();
+    // An agent writes like a partner (docs/BLOG.md): their own posts only.
+    // Editing somebody else's work is an administrator's call, and the id comes
+    // from the request, so the author is pinned here and on the update rather
+    // than trusted to the pages, which only list what the viewer may open.
+    const mine = !user.can.manageSettings;
+    let read = db.from('blog_posts').select('*').eq('id', id);
+    if (mine) read = read.eq('author_id', user.id);
+    const { data: before } = await read.maybeSingle();
     if (!before) return fail('That post no longer exists.');
 
     // The slug follows the title only while the post has never been published.
@@ -75,7 +82,9 @@ export async function saveBlogPostAction(
     const next: typeof fields & { slug?: string } = { ...fields };
     if (!before.published_at) next.slug = await uniqueSlug(title, id);
 
-    const { error } = await db.from('blog_posts').update(next).eq('id', id);
+    let write = db.from('blog_posts').update(next).eq('id', id);
+    if (mine) write = write.eq('author_id', user.id);
+    const { error } = await write;
     if (error) return fail(explain(error));
 
     const changes = diff(before as Record<string, unknown>, next);

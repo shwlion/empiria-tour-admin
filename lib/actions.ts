@@ -65,14 +65,34 @@ export function text(value: FormDataEntryValue | null): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+/**
+ * A whole number, or `fallback` when the field is blank, absent or not a number.
+ *
+ * Blank is checked before parsing because Number('') is 0, which is finite:
+ * without it the fallback only ever applied to text that was not a number, and
+ * a field the form did not render at all was saved as 0.
+ */
 export function integer(value: FormDataEntryValue | null, fallback = 0): number {
-  const n = Number(text(value));
+  const s = text(value);
+  if (s === '') return fallback;
+  const n = Number(s);
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-/** Currency input arrives as "1,850.00"; the database wants 185000. */
+/** What `<input type="number">` submits: digits, a point, an exponent. */
+const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+
+/**
+ * Currency input arrives as "1,850.00"; the database wants 185000.
+ *
+ * A plain number is parsed as it stands, because that is what a number input
+ * submits and the browser accepts exponent notation — "1e3" is a thousand, and
+ * stripping it to its digits first read it as thirteen. Only text that is not
+ * a plain number has its separators and symbols stripped before parsing.
+ */
 export function cents(value: FormDataEntryValue | null, fallback = 0): number {
-  const raw = text(value).replace(/[^0-9.-]/g, '');
+  const s = text(value);
+  const raw = PLAIN_NUMBER.test(s) ? s : s.replace(/[^0-9.-]/g, '');
   if (raw === '') return fallback;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.round(n * 100) : fallback;

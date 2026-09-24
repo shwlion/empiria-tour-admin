@@ -21,9 +21,14 @@ import { slugify } from '@/lib/admin/packages';
  * room it was.
  */
 
-/** Confirm the person may edit this specific tour, and hand back the client. */
-async function authorise(packageId: string): Promise<{ db: Db; user: StaffUser }> {
-  const user = await requireCapability('managePackages');
+/**
+ * Confirm the person may edit this specific tour, and hand back the client.
+ *
+ * The capability check is each action's first line, outside its try: a refusal
+ * is a redirect, which throws by design, and a catch would turn "you may not"
+ * into "that did not save". What is left here fails like any other write.
+ */
+async function authorise(user: StaffUser, packageId: string): Promise<Db> {
   const db = requireWritableDb();
 
   if (user.can.scopedToOwnPackages) {
@@ -32,7 +37,7 @@ async function authorise(packageId: string): Promise<{ db: Db; user: StaffUser }
       throw new Error('That tour belongs to somebody else.');
     }
   }
-  return { db, user };
+  return db;
 }
 
 function touch() {
@@ -46,8 +51,9 @@ export async function saveBasicsAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('managePackages');
   try {
-    const { db, user } = await authorise(packageId);
+    const db = await authorise(user, packageId);
 
     const title = text(form.get('title'));
     if (!title) return fail('A tour needs a title.', { title: 'Required' });
@@ -107,8 +113,9 @@ export async function savePricingAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('managePackages');
   try {
-    const { db, user } = await authorise(packageId);
+    const db = await authorise(user, packageId);
     // Exhibit A denies the Agent role pricing. Enforced on the action, not
     // merely by hiding the tab.
     if (!user.can.setPricing) return fail('Your role cannot set prices.');
@@ -187,8 +194,9 @@ export async function saveItineraryAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('managePackages');
   try {
-    const { db, user } = await authorise(packageId);
+    const db = await authorise(user, packageId);
 
     const ids = form.getAll('day_id').map((v) => text(v));
     const titles = form.getAll('day_title').map((v) => text(v));
@@ -289,8 +297,9 @@ export async function saveOptionsAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('managePackages');
   try {
-    const { db, user } = await authorise(packageId);
+    const db = await authorise(user, packageId);
     if (!user.can.setPricing) {
       return fail('Rooms and extras carry prices, which your role cannot set.');
     }

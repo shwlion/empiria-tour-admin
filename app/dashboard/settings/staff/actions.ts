@@ -24,8 +24,10 @@ export async function inviteStaffAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  // Outside the try, here and below: a refusal is a redirect, which throws by
+  // design, and the catch would turn "you may not" into "could not be sent".
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
 
     const email = text(form.get('email')).toLowerCase();
@@ -99,8 +101,8 @@ export async function setRoleAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
     const role = text(form.get('role'));
 
@@ -125,8 +127,8 @@ export async function setStatusAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
     const status = text(form.get('status')) === 'closed' ? 'closed' : 'active';
 

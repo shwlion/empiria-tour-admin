@@ -54,8 +54,10 @@ export async function approveApplicationAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  // Outside the try, here and below: a refusal is a redirect, which throws by
+  // design, and the catch would turn "you may not" into "could not be approved".
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
 
     // Re-read and re-decide here rather than trusting what the page rendered.
@@ -113,8 +115,8 @@ export async function declineApplicationAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
     const note = text(form.get('review_note'));
 

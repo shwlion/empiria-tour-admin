@@ -44,8 +44,10 @@ export async function saveDestinationAction(
   _prev: ActionResult<{ id: string }> | null,
   form: FormData
 ): Promise<ActionResult<{ id: string }>> {
+  // Outside the try: a refusal is a redirect, which throws by design, and the
+  // catch would turn "you may not" into "that did not save".
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
 
     const name = text(form.get('name'));

@@ -38,8 +38,10 @@ export async function saveCollectionAction(
   _prev: ActionResult<{ id: string }> | null,
   form: FormData
 ): Promise<ActionResult<{ id: string }>> {
+  // Outside the try, here and below: a refusal is a redirect, which throws by
+  // design, and the catch would turn "you may not" into "that did not save".
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
 
     const name = text(form.get('name'));
@@ -119,8 +121,8 @@ export async function saveCollectionAction(
 
 /** The home page's featured row: the ticked tours are featured, the rest are not. */
 export async function setFeaturedAction(_prev: ActionResult | null, form: FormData): Promise<ActionResult> {
+  const user = await requireCapability('manageSettings');
   try {
-    const user = await requireCapability('manageSettings');
     const db = requireWritableDb();
     const featured = new Set(form.getAll('featured').map(String));
 

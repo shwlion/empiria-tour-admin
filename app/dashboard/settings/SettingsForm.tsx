@@ -7,6 +7,7 @@ import {
 } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import type { PlatformSettings, TaxRuleRow } from '@/lib/admin/settings';
+import { useIsHydrated } from '@/lib/hydrated';
 import { saveSettingsAction } from './actions';
 
 type Props = {
@@ -25,6 +26,8 @@ export default function SettingsForm({ settings, currencies, gaps, canEdit }: Pr
     null
   );
   const [rules, setRules] = useState(() => withId(settings.taxRates));
+  // The viewer's zone, so only once hydrated — see lib/hydrated.ts.
+  const hydrated = useIsHydrated();
 
   const addr = settings.contactAddress;
   const fieldError = (k: string) => (state && !state.ok ? state.fields?.[k] : undefined);
@@ -252,7 +255,7 @@ export default function SettingsForm({ settings, currencies, gaps, canEdit }: Pr
       <div className="flex items-center justify-between gap-4">
         <p className="text-[12px] text-muted-foreground">
           {settings.updatedAt
-            ? `Last saved ${new Date(settings.updatedAt).toLocaleString('en-CA')}`
+            ? hydrated && `Last saved ${new Date(settings.updatedAt).toLocaleString('en-CA')}`
             : 'Never saved.'}
         </p>
         {canEdit ? (

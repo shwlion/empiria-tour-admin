@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Banner, Card, Field, Input, SubmitButton, Textarea } from '@/components/ui';
+import { useIsHydrated } from '@/lib/hydrated';
 import type { ActionResult } from '@/lib/actions';
 import type { StaticPage } from '@/lib/admin/content';
 import { saveStaticPageAction } from '../../actions';
@@ -26,6 +27,8 @@ export default function PageForm({
     null
   );
   const err = (k: string) => (state && !state.ok ? state.fields?.[k] : undefined);
+  // The viewer's zone, so only once hydrated — see lib/hydrated.ts.
+  const hydrated = useIsHydrated();
 
   return (
     <form action={formAction} className="flex max-w-3xl flex-col gap-5">
@@ -106,7 +109,9 @@ export default function PageForm({
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-[12px] text-muted-foreground">
-          {page ? `Last edited ${new Date(page.updatedAt).toLocaleString('en-CA')}` : 'Not yet created.'}
+          {page
+            ? hydrated && `Last edited ${new Date(page.updatedAt).toLocaleString('en-CA')}`
+            : 'Not yet created.'}
         </p>
         <SubmitButton>{page ? 'Save page' : 'Create page'}</SubmitButton>
       </div>

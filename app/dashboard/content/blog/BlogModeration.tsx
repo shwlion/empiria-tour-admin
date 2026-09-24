@@ -9,6 +9,7 @@ import {
 import type { ActionResult } from '@/lib/actions';
 import type { AdminBlogPost, BlogStatus } from '@/lib/admin/blog';
 import { STOREFRONT_URL } from '@/lib/storefront';
+import { useIsHydrated } from '@/lib/hydrated';
 import { deleteBlogPostAction, publishBlogPostAction, unpublishBlogPostAction } from './actions';
 
 /**
@@ -39,6 +40,8 @@ export default function BlogModeration({
   active: BlogStatus | 'all';
 }) {
   const [notice, setNotice] = useState<Notice | null>(null);
+  // Timestamps in the viewer's zone, so only once hydrated — see lib/hydrated.ts.
+  const hydrated = useIsHydrated();
   const [takingDown, setTakingDown] = useState<AdminBlogPost | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -120,7 +123,7 @@ export default function BlogModeration({
                     {post.authorName}
                     <span className="text-muted-foreground/60"> · {post.authorRole}</span>
                     <span className="text-muted-foreground/60">
-                      {' '}· updated {new Date(post.updatedAt).toLocaleString('en-CA')}
+                      {hydrated && ` · updated ${new Date(post.updatedAt).toLocaleString('en-CA')}`}
                     </span>
                   </p>
 
@@ -129,7 +132,7 @@ export default function BlogModeration({
                     // require opening the post.
                     <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] leading-relaxed text-destructive">
                       Taken down
-                      {post.unpublishedAt && ` on ${new Date(post.unpublishedAt).toLocaleDateString('en-CA')}`}
+                      {hydrated && post.unpublishedAt && ` on ${new Date(post.unpublishedAt).toLocaleDateString('en-CA')}`}
                       : {post.unpublishReason}
                     </p>
                   )}

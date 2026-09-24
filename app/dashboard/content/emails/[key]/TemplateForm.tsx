@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Banner, Card, Checkbox, Field, Input, SubmitButton, Textarea } from '@/components/ui';
+import { useIsHydrated } from '@/lib/hydrated';
 import type { ActionResult } from '@/lib/actions';
 import type { EmailTemplate } from '@/lib/admin/content';
 import { saveTemplateAction } from './actions';
@@ -14,6 +15,8 @@ export default function TemplateForm({ template }: { template: EmailTemplate }) 
     null
   );
   const err = (k: string) => (state && !state.ok ? state.fields?.[k] : undefined);
+  // The viewer's zone, so only once hydrated — see lib/hydrated.ts.
+  const hydrated = useIsHydrated();
 
   return (
     <form action={formAction} className="flex max-w-3xl flex-col gap-5">
@@ -99,7 +102,7 @@ export default function TemplateForm({ template }: { template: EmailTemplate }) 
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-[12px] text-muted-foreground">
-          Last edited {new Date(template.updatedAt).toLocaleString('en-CA')}
+          {hydrated && `Last edited ${new Date(template.updatedAt).toLocaleString('en-CA')}`}
         </p>
         <SubmitButton>Save email</SubmitButton>
       </div>

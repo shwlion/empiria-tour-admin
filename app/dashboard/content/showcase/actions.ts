@@ -339,10 +339,14 @@ export async function moveShowcaseCardAction(
 }
 
 /**
- * Deletion is real here — nothing references a postcard, so unlike a
- * disclosure block there is no history to sever. A published card is refused
- * all the same: taking something off the landing page should be a decision
- * somebody made, not a side effect of tidying up.
+ * Deletion is real here, with two refusals. A published card is refused:
+ * taking something off the landing page should be a decision somebody made,
+ * not a side effect of tidying up. And since 0021 a postcard can have
+ * history — every placement a partner has asked for names its card, `on
+ * delete restrict`, because that is the record of what was sold — so a card
+ * with any placement, whatever became of it, stays as a draft. The refusal
+ * says so, rather than letting the foreign key surface as a generic "did not
+ * save" that no amount of trying again would change.
  */
 export async function deleteShowcaseCardAction(id: string): Promise<ActionResult> {
   const user = await requireCapability('manageSettings');
@@ -354,7 +358,21 @@ export async function deleteShowcaseCardAction(id: string): Promise<ActionResult
       return fail('That postcard is on the landing page. Unpublish it first, then delete it.');
     }
 
+    const kept = (n: number) =>
+      `“${before.title}” has ${n === 1 ? 'a partner’s promotion request' : `${n} promotion requests`} on record, ` +
+      'kept as the history of what was sold, so it cannot be deleted. It stays a draft, which nobody sees.';
+    const { count, error: countError } = await db
+      .from('showcase_placements')
+      .select('id', { count: 'exact', head: true })
+      .eq('card_id', id);
+    if (countError) throw countError;
+    if (count) return fail(kept(count));
+
     const { error } = await db.from('showcase_cards').delete().eq('id', id);
+    // A request arrived between the count and the delete, and the foreign key
+    // refused it for the same reason: 23001 is how Postgres reports an `on
+    // delete restrict` key, 23503 a plain one.
+    if (error?.code === '23001' || error?.code === '23503') return fail(kept(1));
     if (error) throw error;
 
     await recordAudit(db, user, {

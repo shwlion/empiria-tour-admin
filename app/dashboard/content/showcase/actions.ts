@@ -37,7 +37,7 @@ async function refusalIfSoldCardCut(before: DeckCard[], after: DeckCard[]): Prom
   if (cut.length === 0) return null;
   const p = cut[0];
   return (
-    `“${p.cardTitle}” is ${p.status === 'paid' ? 'paid for' : 'approved'} for ${p.partnerName} from ${p.startsOn} to ${p.endsOn}, ` +
+    `“${p.cardTitle}” is ${p.status === 'paid' ? 'paid for by' : 'approved for'} ${p.partnerName} from ${p.startsOn} to ${p.endsOn}, ` +
     `and this would take it off the landing page, which shows only the first ${SHOWCASE_SLOTS} published postcards. ` +
     'Cancel that placement under Content → Promotions first, or leave the deck as it is.'
   );

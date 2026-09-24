@@ -220,8 +220,10 @@ export async function retireDisclosureAction(blockId: string): Promise<ActionRes
       .eq('id', blockId);
     if (error) throw error;
 
-    // Take it off the site, but keep the rows so re-activating restores it.
-    await db.from('disclosure_placements').delete().eq('block_id', blockId).is('package_id', null);
+    // The status alone takes it off the site: every reader of a placement —
+    // the tour page, the booking steps, the receipt — joins on an active block.
+    // The placement rows stay, so setting it active again puts it back where it
+    // was rather than being refused as placed nowhere.
 
     await recordAudit(db, user, {
       entity: 'disclosure_blocks',
@@ -229,7 +231,7 @@ export async function retireDisclosureAction(blockId: string): Promise<ActionRes
       action: 'unpublish',
       before: { status: before.status },
       after: { status: 'inactive' },
-      summary: `Retired “${before.name}” and removed it from every placement`,
+      summary: `Retired “${before.name}”; its placements are kept for re-activation`,
     });
 
     revalidatePath('/dashboard/content/disclosures');

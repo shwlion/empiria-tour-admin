@@ -5,7 +5,7 @@ import { Badge, Button, EmptyState, PageHeader, Table } from '@/components/ui';
 import { formatDepartureDate, formatPrice } from '@/lib/money';
 import { requireCapability } from '@/lib/auth';
 import { listCustomers } from '@/lib/admin/customers';
-import { getSettings } from '@/lib/admin/settings';
+import { getReportingCurrency } from '@/lib/admin/reports';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Customers · Empiria Tour Admin' };
@@ -15,13 +15,12 @@ export const metadata: Metadata = { title: 'Customers · Empiria Tour Admin' };
  *
  * Everybody who has booked or registered, searchable by name, email or
  * phone. Open to the Agent role: this is the day-to-day desk. Lifetime value
- * is in the default currency, because a customer may have booked in two.
+ * is in the reporting currency, because a customer may have booked in two.
  */
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireCapability('manageCustomers');
   const { q } = await searchParams;
-  const [customers, settings] = await Promise.all([listCustomers({ q }), getSettings()]);
-  const currency = settings.defaultCurrency;
+  const [customers, currency] = await Promise.all([listCustomers({ q }), getReportingCurrency()]);
   const registered = customers.filter((c) => c.registered).length;
 
   return (
@@ -97,6 +96,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               <td className="px-4 py-3 tabular-nums text-foreground">{c.bookingsCount}</td>
               <td className="px-4 py-3 tabular-nums text-foreground">
                 {c.lifetimePaidBaseCents > 0 ? formatPrice(c.lifetimePaidBaseCents, currency) : '—'}
+                {c.unconvertedBookings > 0 && (
+                  <div className="text-[11px] text-muted-foreground">
+                    + {c.unconvertedBookings} in another currency, not converted
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3 text-[12px] text-muted-foreground">
                 {c.lastBookedAt ? formatDepartureDate(c.lastBookedAt.slice(0, 10)) : 'Never'}

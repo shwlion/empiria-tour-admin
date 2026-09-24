@@ -6,7 +6,7 @@ import { Badge, Card, PageHeader, Table } from '@/components/ui';
 import { formatDepartureDate, formatPrice } from '@/lib/money';
 import { requireCapability } from '@/lib/auth';
 import { getCustomer } from '@/lib/admin/customers';
-import { getSettings } from '@/lib/admin/settings';
+import { getReportingCurrency } from '@/lib/admin/reports';
 import CustomerForm from './CustomerForm';
 
 export const dynamic = 'force-dynamic';
@@ -23,10 +23,13 @@ export const metadata: Metadata = { title: 'Customer · Empiria Tour Admin' };
 export default async function CustomerPage({ params }: { params: Promise<{ key: string }> }) {
   await requireCapability('manageCustomers');
   const { key } = await params;
-  const [record, settings] = await Promise.all([getCustomer(decodeURIComponent(key)), getSettings()]);
+  // Next hands the page a dynamic segment percent-encoded — it decodes the
+  // path to match the route, then re-encodes the value it passes on — so one
+  // decode here turns `guest%3Ajo%40example.com` back into the key the list
+  // linked to. Dropping it would 404 every guest.
+  const [record, currency] = await Promise.all([getCustomer(decodeURIComponent(key)), getReportingCurrency()]);
   if (!record) notFound();
   const { customer, bookings, address } = record;
-  const currency = settings.defaultCurrency;
   const paidBookings = bookings.filter((b) => b.amountPaidCents > 0).length;
 
   return (
@@ -108,6 +111,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ key: 
             <p className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
               {formatPrice(customer.lifetimePaidBaseCents, currency)}
             </p>
+            {customer.unconvertedBookings > 0 && (
+              <p className="mt-1 text-[12px] text-destructive">
+                {customer.unconvertedBookings === 1 ? '1 booking' : `${customer.unconvertedBookings} bookings`} in
+                another currency {customer.unconvertedBookings === 1 ? 'has' : 'have'} no exchange rate on record, so
+                {customer.unconvertedBookings === 1 ? ' its' : ' their'} money is not in this figure.
+              </p>
+            )}
             <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
               <div>
                 <dt className="text-muted-foreground">Bookings</dt>

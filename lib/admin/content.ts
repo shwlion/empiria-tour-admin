@@ -101,7 +101,12 @@ export type DisclosureBlock = {
   requiresAcknowledgement: boolean;
   status: string;
   updatedAt: string;
-  /** Placement values this block is assigned to, across all packages. */
+  /**
+   * Placement values this block is assigned to on every tour — the rows with no
+   * package. They are what the editor's checkboxes show and what its save
+   * reconciles; a placement made for one tour only is not in this list, since
+   * seeding the form with it would save it back as a placement on every tour.
+   */
   placements: string[];
   /** How many bookings have already agreed to this wording. */
   acknowledgedCount: number;
@@ -113,7 +118,7 @@ export async function listDisclosureBlocks(): Promise<DisclosureBlock[]> {
 
   const [{ data: blocks }, { data: placements }, { data: acks }] = await Promise.all([
     db.from('disclosure_blocks').select('*').order('name'),
-    db.from('disclosure_placements').select('block_id, placement'),
+    db.from('disclosure_placements').select('block_id, placement').is('package_id', null),
     db.from('booking_acknowledgements').select('block_id'),
   ]);
   if (!blocks?.length) return [];

@@ -61,7 +61,7 @@ type PlacementJoined = {
   hold_until: string | null; paid_at: string | null; note: string | null;
   decided_at: string | null; created_at: string;
   showcase_cards: { title: string } | null;
-  users: { name: string | null; email: string } | null;
+  users: { full_name: string | null; email: string | null } | null;
 };
 
 const STATUSES: PlacementStatus[] = ['requested', 'approved', 'paid', 'rejected', 'cancelled'];
@@ -72,7 +72,7 @@ function toPlacement(r: PlacementJoined): PlacementRecord {
     cardId: r.card_id,
     cardTitle: r.showcase_cards?.title ?? 'A deleted card',
     partnerId: r.partner_id,
-    partnerName: r.users?.name ?? r.users?.email ?? 'Unknown partner',
+    partnerName: r.users?.full_name || r.users?.email || 'Unknown partner',
     partnerEmail: r.users?.email ?? '',
     startsOn: r.starts_on,
     endsOn: r.ends_on,
@@ -95,32 +95,49 @@ function toPlacement(r: PlacementJoined): PlacementRecord {
   };
 }
 
+// `users` is embedded by the partner_id foreign key because the table has two
+// (decided_by is the other). Its name column is `full_name`: the string is not
+// a literal type, so a wrong column here is not a compile error — it is a
+// PostgREST 400 at run time, which is why the readers below do not swallow it.
 const SELECT =
   'id, card_id, partner_id, starts_on, ends_on, title, kicker, description, image_url, image_alt, ' +
   'link_url, price_cents, currency, status, hold_until, paid_at, note, decided_at, created_at, ' +
-  'showcase_cards ( title ), users!showcase_placements_partner_id_fkey ( name, email )';
+  'showcase_cards ( title ), users!showcase_placements_partner_id_fkey ( full_name, email )';
 
 /**
  * The queue: everything still needing a decision, oldest first — a partner who
  * asked on Monday should not be behind one who asked on Friday — then
  * everything settled, newest first.
+ *
+ * Null when the read failed, which is not the same answer as an empty queue:
+ * an empty queue says nobody has asked, and a broken select once said exactly
+ * that for every request partners made.
  */
-export async function listPlacements(status?: PlacementStatus): Promise<PlacementRecord[]> {
+export async function listPlacements(status?: PlacementStatus): Promise<PlacementRecord[] | null> {
   const db = getSupabaseAdmin();
   if (!db) return [];
   let q = db.from('showcase_placements').select(SELECT);
   if (status) q = q.eq('status', status);
   const { data, error } = await q.order('created_at', { ascending: false }).limit(500);
-  if (error || !data) return [];
+  if (error || !data) {
+    console.error('[placements] list failed', error?.message);
+    return null;
+  }
   const rows = (data as unknown as PlacementJoined[]).map(toPlacement);
   const pending = rows.filter((p) => p.status === 'requested').reverse();
   return [...pending, ...rows.filter((p) => p.status !== 'requested')];
 }
 
+/**
+ * One placement, or null when there is no such row. A failed read throws
+ * instead: every caller is a decision, and "that request no longer exists"
+ * is the wrong thing to tell somebody whose request is sitting right there.
+ */
 export async function getPlacement(id: string): Promise<PlacementRecord | null> {
   const db = getSupabaseAdmin();
   if (!db) return null;
-  const { data } = await db.from('showcase_placements').select(SELECT).eq('id', id).maybeSingle();
+  const { data, error } = await db.from('showcase_placements').select(SELECT).eq('id', id).maybeSingle();
+  if (error) throw error;
   return data ? toPlacement(data as unknown as PlacementJoined) : null;
 }
 

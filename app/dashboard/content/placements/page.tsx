@@ -23,13 +23,18 @@ export const metadata: Metadata = { title: 'Promotions · Empiria Tour Admin' };
  *   - No sellable cards. Every card is `sellable = false` until somebody says
  *     otherwise, which is deliberate — but it also means partners cannot ask
  *     for anything, and an empty queue would otherwise look like no demand.
+ *
+ * A queue that could not be read says so, for the same reason: it once
+ * showed "No requests yet" to every administrator while partners' requests
+ * sat in the table behind a broken select.
  */
 export default async function PlacementsPage() {
   await requireCapability('manageSettings');
-  const [placements, { cards, defaultRateCents, currency }] = await Promise.all([
+  const [read, { cards, defaultRateCents, currency }] = await Promise.all([
     listPlacements(),
     listSellableCards(),
   ]);
+  const placements = read ?? [];
 
   const sellable = cards.filter((c) => c.sellable);
   const pending = placements.filter((p) => p.status === 'requested');
@@ -69,6 +74,13 @@ export default async function PlacementsPage() {
         </Banner>
       )}
 
+      {read === null && (
+        <Banner tone="error">
+          The requests could not be read, so partners may be waiting on decisions this page cannot
+          show. The reason is in the server log.
+        </Banner>
+      )}
+
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-[12px] font-medium text-muted-foreground">Awaiting a decision</p>
@@ -89,7 +101,7 @@ export default async function PlacementsPage() {
         </div>
       </div>
 
-      {placements.length === 0 ? (
+      {read === null ? null : placements.length === 0 ? (
         <Card title="Requests">
           <EmptyState
             title="No requests yet"

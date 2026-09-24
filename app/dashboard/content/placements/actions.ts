@@ -5,7 +5,15 @@ import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit } from '@/lib/audit';
 import { cents, explain, fail, ok, text, type ActionResult } from '@/lib/actions';
-import { conflictsFor, getPlacement, MAX_PLACEMENT_DAYS, placementDays } from '@/lib/admin/placements';
+import { SHOWCASE_SLOTS } from '@/lib/admin/content';
+import {
+  conflictsFor,
+  getPlacement,
+  MAX_PLACEMENT_DAYS,
+  placementDays,
+  readDeck,
+  shownOnLandingPage,
+} from '@/lib/admin/placements';
 
 /**
  * Deciding on a partner's request for a postcard (migration 0021).
@@ -44,6 +52,12 @@ const CHANGED = 'That request changed while you were deciding. Reload the page t
  * regardless and its violation is translated rather than pre-empted: two
  * admins approving overlapping windows at the same instant both pass the
  * check and only one passes the constraint.
+ *
+ * The card must be on the landing page — among the first four published —
+ * because the storefront puts a placement only into a card it is showing. A
+ * request can outlive its card's place there (partners can only ask for a
+ * card that is showing, but it can be unpublished before anybody decides),
+ * and approving it then would sell days nobody sees.
  */
 export async function approvePlacementAction(
   placementId: string,
@@ -72,6 +86,14 @@ export async function approvePlacementAction(
     if (days <= 0) return fail('That request has an impossible date range.');
     if (days > MAX_PLACEMENT_DAYS) {
       return fail(`That window is ${days} days. Approve at most ${MAX_PLACEMENT_DAYS} at a time.`);
+    }
+
+    if (!shownOnLandingPage(await readDeck()).has(placement.cardId)) {
+      return fail(
+        `“${placement.cardTitle}” is not on the landing page — it is a draft, or past the first ${SHOWCASE_SLOTS} ` +
+          'published postcards — so the partner would be paying for days nobody sees. Put it back under ' +
+          'Content → Showcase, or reject this request.'
+      );
     }
 
     const clashes = await conflictsFor(placement.cardId, placement.startsOn, placement.endsOn, placement.id);

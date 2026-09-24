@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { dateIn, REPORT_TIMEZONE } from '@/lib/admin/reports';
+import { SHOWCASE_SLOTS } from '@/lib/admin/content';
 
 /**
  * Paid promotion of the landing-page postcards (migration 0021).
@@ -158,6 +159,81 @@ export async function getPlacement(id: string): Promise<PlacementRecord | null> 
   const { data, error } = await db.from('showcase_placements').select(SELECT).eq('id', id).maybeSingle();
   if (error) throw error;
   return data ? toPlacement(data as unknown as PlacementJoined) : null;
+}
+
+/** A postcard as the deck orders it: enough to know whether the landing page shows it. */
+export type DeckCard = { id: string; title: string; status: string };
+
+/**
+ * Every postcard, drafts included, in the order the storefront reads them:
+ * sort_order, then created_at, as `getShowcaseCards` orders them. A failed
+ * read throws, because the checks built on this must not pass on the grounds
+ * that they could not look.
+ */
+export async function readDeck(): Promise<DeckCard[]> {
+  const db = getSupabaseAdmin();
+  if (!db) return [];
+  const { data, error } = await db
+    .from('showcase_cards')
+    .select('id, title, status')
+    .order('sort_order')
+    .order('created_at');
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * The postcards the landing page shows, given the whole deck in its order: the
+ * first SHOWCASE_SLOTS published. That is the rule `getShowcaseCards` applies
+ * on the storefront, restated here so the console can check a change against
+ * it before making it.
+ */
+export function shownOnLandingPage(deck: Pick<DeckCard, 'id' | 'status'>[]): Set<string> {
+  return new Set(
+    deck
+      .filter((c) => c.status === 'published')
+      .slice(0, SHOWCASE_SLOTS)
+      .map((c) => c.id)
+  );
+}
+
+/**
+ * The placements a change to the deck would take off the landing page:
+ * approved or paid, not yet finished, on a card shown before the change and
+ * not after it.
+ *
+ * The storefront puts a placement only into a card it is already showing. So
+ * unpublishing a sold card, or pushing it past the fourth published one,
+ * silently stops the partner's words appearing — for days they have paid for,
+ * while their own dashboard goes on calling it live. A card that was already
+ * off the page is not counted: this change is not what took it off.
+ */
+export function placementsCutBy(
+  before: Pick<DeckCard, 'id' | 'status'>[],
+  after: Pick<DeckCard, 'id' | 'status'>[],
+  held: PlacementRecord[]
+): PlacementRecord[] {
+  const was = shownOnLandingPage(before);
+  const will = shownOnLandingPage(after);
+  return held.filter((p) => was.has(p.cardId) && !will.has(p.cardId));
+}
+
+/**
+ * Approved and paid placements whose window has not ended, soonest first: the
+ * promises a change to the deck has to keep. Throws on a failed read, for the
+ * same reason as `readDeck`.
+ */
+export async function unfinishedPlacements(): Promise<PlacementRecord[]> {
+  const db = getSupabaseAdmin();
+  if (!db) return [];
+  const { data, error } = await db
+    .from('showcase_placements')
+    .select(SELECT)
+    .in('status', ['approved', 'paid'])
+    .gte('ends_on', todayInSellerCalendar())
+    .order('starts_on');
+  if (error) throw error;
+  return ((data ?? []) as unknown as PlacementJoined[]).map(toPlacement);
 }
 
 /** Cards that may be sold at all, with the rate each would quote. */

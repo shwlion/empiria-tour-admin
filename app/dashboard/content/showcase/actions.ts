@@ -5,7 +5,8 @@ import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
 import { cents, checkbox, explain, fail, ok, text, type ActionResult, type FieldErrors } from '@/lib/actions';
-import { SHOWCASE_LIMITS as LIMITS } from '@/lib/admin/content';
+import { SHOWCASE_LIMITS as LIMITS, SHOWCASE_SLOTS } from '@/lib/admin/content';
+import { placementsCutBy, readDeck, unfinishedPlacements, type DeckCard } from '@/lib/admin/placements';
 
 /**
  * The landing page's postcards.
@@ -18,6 +19,32 @@ import { SHOWCASE_LIMITS as LIMITS } from '@/lib/admin/content';
  */
 
 const PATH = '/dashboard/content/showcase';
+
+/**
+ * Refuse a change to the deck that would take a sold postcard off the landing
+ * page (migration 0021).
+ *
+ * The storefront shows the first four published cards and puts a partner's
+ * placement only into one of those. Unpublishing a card, or moving or
+ * publishing another so that it drops to fifth, would stop a placement
+ * appearing — silently, for days somebody has paid or been approved for. So
+ * the change is refused, the same way archiving a place is refused while a
+ * tour points at it; cancelling the placement first is a decision somebody
+ * makes under Promotions, with the partner told. Returns the refusal, or null.
+ */
+async function refusalIfSoldCardCut(before: DeckCard[], after: DeckCard[]): Promise<string | null> {
+  const cut = placementsCutBy(before, after, await unfinishedPlacements());
+  if (cut.length === 0) return null;
+  const p = cut[0];
+  return (
+    `“${p.cardTitle}” is ${p.status === 'paid' ? 'paid for' : 'approved'} for ${p.partnerName} from ${p.startsOn} to ${p.endsOn}, ` +
+    `and this would take it off the landing page, which shows only the first ${SHOWCASE_SLOTS} published postcards. ` +
+    'Cancel that placement under Content → Promotions first, or leave the deck as it is.'
+  );
+}
+
+/** What unpublishing is usually for, and needs no unpublishing: the card's own words and photograph. */
+const EDIT_IN_PLACE = ' The card’s own photograph and words can be edited while it stays published.';
 
 /**
  * A photograph's address: https, or a root-relative path on the storefront.
@@ -139,6 +166,12 @@ export async function saveShowcaseCardAction(
       const changed = diff(before as Record<string, unknown>, content);
       if (!changed) return ok(undefined, 'Nothing changed.');
 
+      if (before.status !== status) {
+        const deck = await readDeck();
+        const refusal = await refusalIfSoldCardCut(deck, deck.map((c) => (c.id === id ? { ...c, status } : c)));
+        if (refusal) return fail(status === 'draft' ? refusal + EDIT_IN_PLACE : refusal);
+      }
+
       const { error } = await db.from('showcase_cards').update(row).eq('id', id);
       if (error) throw error;
 
@@ -209,6 +242,12 @@ export async function setShowcaseStatusAction(
     if (!before) return fail('That postcard no longer exists.');
     if (before.status === status) return ok(undefined, `Already ${status}.`);
 
+    // Publishing can cut a sold card too: a draft sitting earlier in the order
+    // pushes the fourth published card to fifth.
+    const deck = await readDeck();
+    const refusal = await refusalIfSoldCardCut(deck, deck.map((c) => (c.id === id ? { ...c, status } : c)));
+    if (refusal) return fail(status === 'draft' ? refusal + EDIT_IN_PLACE : refusal);
+
     const { error } = await db
       .from('showcase_cards')
       .update({ status, updated_by: user.id })
@@ -254,7 +293,7 @@ export async function moveShowcaseCardAction(
     const db = requireWritableDb();
     const { data: cards } = await db
       .from('showcase_cards')
-      .select('id, title, sort_order')
+      .select('id, title, status, sort_order')
       .order('sort_order')
       .order('created_at');
     const deck = cards ?? [];
@@ -266,6 +305,11 @@ export async function moveShowcaseCardAction(
 
     const next = [...deck];
     [next[from], next[to]] = [next[to], next[from]];
+
+    // The renumbering below makes `next` the storefront's order, so a sold
+    // card it would push past the fourth published is refused here.
+    const refusal = await refusalIfSoldCardCut(deck, next);
+    if (refusal) return fail(refusal);
 
     for (let i = 0; i < next.length; i++) {
       const card = next[i];

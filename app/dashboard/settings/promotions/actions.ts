@@ -93,14 +93,19 @@ export async function savePromotionAction(
     let promotionId: string;
     if (existing) {
       promotionId = existing.id;
+      // The window's edges are compared as instants. PostgREST renders a stored
+      // edge as "2026-09-01T00:00:00+00:00" and windowStart writes
+      // "2026-09-01T00:00:00.000Z": the same moment and a different string, so
+      // every save of a dated code recorded a date change nobody had made.
+      const instant = (iso: string | null) => (iso ? new Date(iso).toISOString() : null);
       const before = {
         code: existing.code,
         description: existing.description,
         discount_type: existing.discountType,
         discount_value: existing.discountValue,
         currency: existing.currency,
-        valid_from: existing.validFrom,
-        valid_until: existing.validUntil,
+        valid_from: instant(existing.validFrom),
+        valid_until: instant(existing.validUntil),
         usage_limit: existing.usageLimit,
         per_user_limit: existing.perUserLimit,
       };

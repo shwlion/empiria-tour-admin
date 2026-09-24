@@ -299,8 +299,49 @@ export async function saveOptionsAction(
     const roomIds = form.getAll('room_id').map((v) => text(v));
     const roomNames = form.getAll('room_name').map((v) => text(v));
     const defaultRoom = text(form.get('room_default'));
-    const keptRooms: string[] = [];
 
+    // The rooms this tour has now. Only these ids are updated: an id from any
+    // other tour is saved here as a new room rather than moved over from there.
+    const { data: currentRooms, error: roomReadError } = await db
+      .from('room_types')
+      .select('id')
+      .eq('package_id', packageId);
+    if (roomReadError) throw roomReadError;
+    const hadRooms = new Set((currentRooms ?? []).map((r) => r.id));
+    const listedRooms = new Set(roomIds.filter((id, i) => roomNames[i] && hadRooms.has(id)));
+    const removedRooms = [...hadRooms].filter((id) => !listedRooms.has(id));
+
+    // bookings.room_type_id is ON DELETE SET NULL, so deleting a room somebody
+    // has booked would quietly erase which room they were sold. A room has no
+    // retired state the way an extra does, so a booked one is refused outright
+    // — and before anything is written, so the refusal leaves the tour as it was.
+    if (removedRooms.length) {
+      const { count, error } = await db
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .in('room_type_id', removedRooms);
+      if (error) throw error;
+      if (count) {
+        return fail(
+          'One of the rooms you removed has already been booked, so it cannot be deleted — the booking would lose the room it was sold. Leave it in place.'
+        );
+      }
+    }
+
+    // The schema allows one default per package, checked row by row, and the
+    // rows below are written one at a time — so whatever holds the flag now is
+    // cleared first. Otherwise moving the default to an earlier row sets the
+    // new one while the old one still has it.
+    let clearDefault = db
+      .from('room_types')
+      .update({ is_default: false })
+      .eq('package_id', packageId)
+      .eq('is_default', true);
+    if (hadRooms.has(defaultRoom)) clearDefault = clearDefault.neq('id', defaultRoom);
+    const { error: clearError } = await clearDefault;
+    if (clearError) throw clearError;
+
+    const keptRooms: string[] = [];
     for (let i = 0; i < roomNames.length; i++) {
       if (!roomNames[i]) continue;
       const row = {
@@ -314,8 +355,8 @@ export async function saveOptionsAction(
         is_default: defaultRoom !== '' && defaultRoom === (roomIds[i] || `new-${i}`),
         sort_order: keptRooms.length,
       };
-      if (roomIds[i]) {
-        const { error } = await db.from('room_types').update(row).eq('id', roomIds[i]);
+      if (hadRooms.has(roomIds[i])) {
+        const { error } = await db.from('room_types').update(row).eq('id', roomIds[i]).eq('package_id', packageId);
         if (error) throw error;
         keptRooms.push(roomIds[i]);
       } else {
@@ -324,9 +365,10 @@ export async function saveOptionsAction(
         keptRooms.push(data.id);
       }
     }
-    let delRooms = db.from('room_types').delete().eq('package_id', packageId);
-    if (keptRooms.length) delRooms = delRooms.not('id', 'in', `(${keptRooms.join(',')})`);
-    await delRooms;
+    if (removedRooms.length) {
+      const { error } = await db.from('room_types').delete().eq('package_id', packageId).in('id', removedRooms);
+      if (error) throw error;
+    }
 
     // ── extras ──
     const extraIds = form.getAll('extra_id').map((v) => text(v));
@@ -347,7 +389,7 @@ export async function saveOptionsAction(
         sort_order: keptExtras.length,
       };
       if (extraIds[i]) {
-        const { error } = await db.from('package_extras').update(row).eq('id', extraIds[i]);
+        const { error } = await db.from('package_extras').update(row).eq('id', extraIds[i]).eq('package_id', packageId);
         if (error) throw error;
         keptExtras.push(extraIds[i]);
       } else {
@@ -362,7 +404,8 @@ export async function saveOptionsAction(
     // removed extra is retired instead of deleted.
     let retire = db.from('package_extras').update({ status: 'inactive' }).eq('package_id', packageId);
     if (keptExtras.length) retire = retire.not('id', 'in', `(${keptExtras.join(',')})`);
-    await retire;
+    const { error: retireError } = await retire;
+    if (retireError) throw retireError;
 
     // ── custom fields ──
     const fieldIds = form.getAll('field_id').map((v) => text(v));
@@ -383,7 +426,7 @@ export async function saveOptionsAction(
         sort_order: keptFields.length,
       };
       if (fieldIds[i]) {
-        const { error } = await db.from('package_custom_fields').update(row).eq('id', fieldIds[i]);
+        const { error } = await db.from('package_custom_fields').update(row).eq('id', fieldIds[i]).eq('package_id', packageId);
         if (error) throw error;
         keptFields.push(fieldIds[i]);
       } else {

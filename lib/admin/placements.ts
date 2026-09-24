@@ -118,7 +118,8 @@ function toPlacement(r: PlacementJoined): PlacementRecord {
 // `users` is embedded by the partner_id foreign key because the table has two
 // (decided_by is the other). Its name column is `full_name`: the string is not
 // a literal type, so a wrong column here is not a compile error — it is a
-// PostgREST 400 at run time, which is why the readers below do not swallow it.
+// PostgREST 400 at run time, which is why the queue and the decisions no longer
+// swallow a failed read (`listPlacements`, `getPlacement`).
 const SELECT =
   'id, card_id, partner_id, starts_on, ends_on, title, kicker, description, image_url, image_alt, ' +
   'link_url, price_cents, currency, status, hold_until, paid_at, note, decided_at, created_at, ' +

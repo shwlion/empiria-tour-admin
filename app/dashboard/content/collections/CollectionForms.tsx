@@ -92,6 +92,10 @@ export function FeaturedForm({ packages }: { packages: PackageChoice[] }) {
         <p className="text-[13px] text-muted-foreground">Nothing is published yet, so nothing can be featured.</p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
+          {/* What this form showed: a draft the tour editor featured is not here, and keeps its flag. */}
+          {published.map((p) => (
+            <input key={`offered-${p.id}`} type="hidden" name="featured_offered" value={p.id} />
+          ))}
           {published.map((p) => (
             <Checkbox key={p.id} id={`feat-${p.id}`} name="featured" value={p.id} defaultChecked={p.isFeatured} label={p.title} hint={p.destination ?? undefined} />
           ))}

@@ -123,16 +123,23 @@ export async function saveCollectionAction(
   }
 }
 
-/** The home page's featured row: the ticked tours are featured, the rest are not. */
+/**
+ * The home page's featured row: of the tours the form showed, the ticked ones
+ * are featured and the rest are not. The form shows published tours only, and
+ * the tour editor can feature a draft ahead of its launch — so a tour the form
+ * never offered keeps whatever flag it has.
+ */
 export async function setFeaturedAction(_prev: ActionResult | null, form: FormData): Promise<ActionResult> {
   const user = await requireCapability('manageSettings');
   try {
     const db = requireWritableDb();
     const featured = new Set(form.getAll('featured').map(String));
+    const offered = new Set(form.getAll('featured_offered').map(String));
 
     const { data: pkgs } = await db.from('packages').select('id, title, is_featured').neq('status', 'archived');
     const changes: { id: string; title: string; to: boolean }[] = [];
     for (const p of (pkgs ?? []) as { id: string; title: string; is_featured: boolean }[]) {
+      if (!offered.has(p.id)) continue;
       const to = featured.has(p.id);
       if (to !== p.is_featured) changes.push({ id: p.id, title: p.title, to });
     }

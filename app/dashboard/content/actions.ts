@@ -5,7 +5,7 @@ import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
 import { checkbox, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
-import { PLACEMENTS } from '@/lib/admin/content';
+import { PLACEMENTS, REQUIRED_PAGES } from '@/lib/admin/content';
 
 /**
  * B6 content writes.
@@ -49,7 +49,20 @@ export async function saveStaticPageAction(
 
   try {
     const db = requireWritableDb();
-    const { data: before } = await db.from('static_pages').select('*').eq('slug', slug).maybeSingle();
+    const { data: before, error: readError } = await db
+      .from('static_pages')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
+    if (readError) throw readError;
+
+    // The slug is bound by the page, but a server action can be called with
+    // any value, and there is no way to delete a page from this console. So a
+    // page is created only when it is one the storefront has a route for; any
+    // other slug must already be a row, as the edit page itself requires.
+    if (!before && !REQUIRED_PAGES.some((r) => r.slug === slug)) {
+      return fail('That page does not exist.');
+    }
 
     // Upsert rather than update: one of the four required pages may have no row
     // at all, and the storefront 404s until it does.

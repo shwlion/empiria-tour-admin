@@ -8,7 +8,7 @@ import { recordAudit, diff } from '@/lib/audit';
 import { checkbox, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
 import { formatPrice } from '@/lib/money';
 import { RESENDABLE } from '@/lib/admin/emails';
-import { parseAmount } from '@/lib/admin/bookings';
+import { TRAVELLING_STATUSES, bookingEmailData, loadBookingEmailFacts, parseAmount, whyNotSendable } from '@/lib/admin/bookings';
 
 /**
  * The three writes B3 actually owns.
@@ -153,11 +153,81 @@ export async function recordManualPaymentAction(
         (note ? ` — ${note}` : ''),
     });
 
+    const emails = await queuePaymentEmails(db, bookingId, amount, providerRef);
+
     revalidatePath(`/dashboard/bookings/${bookingId}`);
     revalidatePath('/dashboard/bookings');
-    return ok(undefined, kind === 'refund' ? 'Refund recorded.' : 'Payment recorded.');
+    const done = kind === 'refund' ? 'Refund recorded.' : 'Payment recorded.';
+    if (emails === 'failed') {
+      return ok(undefined, `${done} The email to the traveller could not be queued; send it from Emails on this page.`);
+    }
+    return ok(undefined, emails === 'queued' ? `${done} The traveller's email is queued.` : done);
   } catch (error) {
     return fail(explain(error));
+  }
+}
+
+/**
+ * The Part C messages an offline payment sends: the Stripe webhook's decision
+ * (the storefront's `enqueueForPayment` and `enqueueRefundIssued`), made the
+ * same way, from the booking as `record_payment` left it. The confirmation
+ * goes once, on the first money whatever it covered; then a deposit
+ * acknowledgement while a balance remains, or the paid-in-full receipt when
+ * none does; a refund sends the refund notice. Money for a booking that is not
+ * travelling — cancelled before it arrived — sends nothing; record_payment
+ * flags it for a person instead.
+ *
+ * The once-per-booking messages carry the storefront's dedupe keys, so a later
+ * card payment cannot confirm the booking a second time; the others carry this
+ * payment's own reference, so two equal instalments are two emails. There is
+ * no staff alert: a member of staff is the one recording the payment, and the
+ * alert's address is the storefront's setting, not this console's.
+ *
+ * Best-effort, as NOTIFICATIONS.md requires: the money is already recorded,
+ * and nothing here may undo that or make the action report a failure.
+ */
+async function queuePaymentEmails(
+  db: ReturnType<typeof requireWritableDb>,
+  bookingId: string,
+  amount: number,
+  providerRef: string
+): Promise<'queued' | 'none' | 'failed'> {
+  try {
+    const f = await loadBookingEmailFacts(bookingId);
+    if (!f?.leadEmail) return 'none';
+
+    const sends: { templateKey: string; dedupeKey: string }[] = [];
+    if (amount < 0) {
+      sends.push({ templateKey: 'refund_issued', dedupeKey: `refund_issued:${providerRef}` });
+    } else if ((TRAVELLING_STATUSES as readonly string[]).includes(f.status)) {
+      sends.push({ templateKey: 'booking_confirmed', dedupeKey: `booking_confirmed:${f.id}` });
+      sends.push(
+        f.balanceCents > 0
+          ? { templateKey: 'deposit_taken', dedupeKey: `deposit_taken:${f.id}:${providerRef}` }
+          : { templateKey: 'balance_paid', dedupeKey: `balance_paid:${f.id}` }
+      );
+    }
+    if (sends.length === 0) return 'none';
+
+    for (const send of sends) {
+      const { error } = await db.rpc('enqueue_email', {
+        p_payload: {
+          template_key: send.templateKey,
+          to_email: f.leadEmail,
+          to_name: f.leadName,
+          booking_id: f.id,
+          departure_id: f.departureId,
+          user_id: f.userId,
+          merge_data: bookingEmailData(f, send.templateKey, amount),
+          dedupe_key: send.dedupeKey,
+        } as never,
+      });
+      if (error) throw new Error(error.message);
+    }
+    return 'queued';
+  } catch (error) {
+    console.error('[bookings] payment email not queued', error);
+    return 'failed';
   }
 }
 
@@ -237,8 +307,9 @@ export async function resendEmailAction(
   _prev: ActionResult | null,
   form: FormData
 ): Promise<ActionResult> {
+  const user = await requireCapability('manageBookings');
+
   try {
-    const user = await requireCapability('manageBookings');
     const db = requireWritableDb();
     const templateKey = text(form.get('template_key'));
 
@@ -246,33 +317,27 @@ export async function resendEmailAction(
       return fail('That is not a message staff can send by hand.');
     }
 
-    const { data: booking } = await db
-      .from('bookings')
-      .select('id, reference, lead_email, lead_name')
-      .eq('id', bookingId)
-      .maybeSingle();
-    if (!booking) return fail('That booking no longer exists.');
-    if (!booking.lead_email) return fail('This booking has no email address on it.');
-
     // The facts are rebuilt from the booking as it stands now, not copied from
-    // the original send — a resent balance reminder should quote today's
-    // balance, not the one from three weeks ago.
-    const { data: existing } = await db
-      .from('email_messages')
-      .select('merge_data')
-      .eq('booking_id', bookingId)
-      .eq('template_key', templateKey)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // an earlier send: a resent balance reminder quotes today's balance, and a
+    // booking that never had the automatic message — paid offline, or before
+    // the outbox existed — can still be sent one. A message the booking does
+    // not support is refused here, with the reason, rather than queued to fail
+    // at the drain for want of a fact.
+    const facts = await loadBookingEmailFacts(bookingId);
+    if (!facts) return fail('That booking no longer exists.');
+    if (!facts.leadEmail) return fail('This booking has no email address on it.');
+    const why = whyNotSendable(facts, templateKey);
+    if (why) return fail(why);
 
     const { error } = await db.rpc('enqueue_email', {
       p_payload: {
         template_key: templateKey,
-        to_email: booking.lead_email,
-        to_name: booking.lead_name,
-        booking_id: bookingId,
-        merge_data: existing?.merge_data ?? {},
+        to_email: facts.leadEmail,
+        to_name: facts.leadName,
+        booking_id: facts.id,
+        departure_id: facts.departureId,
+        user_id: facts.userId,
+        merge_data: bookingEmailData(facts, templateKey, facts.lastPaymentCents),
         dedupe_key: null,
       } as never,
     });
@@ -282,7 +347,7 @@ export async function resendEmailAction(
       entity: 'booking',
       entityId: bookingId,
       action: 'resend_email',
-      summary: `Queued a ${templateKey.replace(/_/g, ' ')} email to ${booking.lead_email}`,
+      summary: `Queued a ${templateKey.replace(/_/g, ' ')} email to ${facts.leadEmail}`,
     });
 
     revalidatePath(`/dashboard/bookings/${bookingId}`);

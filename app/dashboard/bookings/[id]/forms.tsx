@@ -117,7 +117,8 @@ export function ManualPaymentForm({
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
         For money that arrived outside Stripe. Card payments record themselves through the
-        webhook — never re-enter one here, or it will be counted twice.
+        webhook — never re-enter one here, or it will be counted twice. The traveller is emailed
+        as they would be for a card payment.
       </p>
       <div className="mt-3 flex justify-end">
         <SubmitButton>Record payment</SubmitButton>

@@ -6,7 +6,7 @@ import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit } from '@/lib/audit';
 import { cents, explain, fail, integer, nullable, ok, text, type ActionResult } from '@/lib/actions';
-import { slugify } from '@/lib/admin/packages';
+import { getPackage, publishBlockers, slugify } from '@/lib/admin/packages';
 
 /**
  * Creating a tour asks for the least it can get away with.
@@ -74,7 +74,9 @@ export async function createPackageAction(
  * Publish, unpublish or archive.
  *
  * Publishing is refused while anything essential is missing — a live tour that
- * cannot be booked is worse for Empiria than a draft nobody can see.
+ * cannot be booked is worse for Empiria than a draft nobody can see. The Publish
+ * button checks the same list, but as it stood when the page was rendered; the
+ * refusal that counts is made here, against the tour as it is now.
  */
 export async function setPackageStatusAction(
   packageId: string,
@@ -92,6 +94,15 @@ export async function setPackageStatusAction(
     if (!before) return fail('That tour no longer exists.');
     if (user.can.scopedToOwnPackages && before.partner_id !== user.id) {
       return fail('That tour belongs to somebody else.');
+    }
+
+    if (status === 'published') {
+      const detail = await getPackage(packageId);
+      if (!detail) return fail('That tour no longer exists.');
+      const blockers = publishBlockers(detail);
+      if (blockers.length) {
+        return fail(`Not ready to publish. This tour still needs: ${blockers.join(' ')}`);
+      }
     }
 
     const { error } = await db

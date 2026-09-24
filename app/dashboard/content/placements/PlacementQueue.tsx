@@ -49,6 +49,9 @@ function Row({ row, currency, today }: { row: QueueRow; currency: string; today:
   // days against everybody else. Nothing expires it automatically, so the
   // console is what makes it visible. `today` is Toronto's, from the server.
   const stale = p.status === 'approved' && p.holdUntil != null && p.holdUntil < today;
+  // A request whose first day has gone cannot be approved as asked (the
+  // action refuses it), so the row says so instead of offering the button.
+  const startPassed = p.status === 'requested' && p.startsOn < today;
 
   return (
     <div className="border-b border-border px-4 py-4 last:border-0">
@@ -58,6 +61,7 @@ function Row({ row, currency, today }: { row: QueueRow; currency: string; today:
             <span className="font-semibold text-foreground">{p.cardTitle}</span>
             <Badge value={p.status} />
             {stale && <span className="text-[12px] font-medium text-destructive">hold expired</span>}
+            {startPassed && <span className="text-[12px] font-medium text-destructive">start date passed</span>}
           </div>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             {p.partnerName} · {day(p.startsOn)} – {day(p.endsOn)} · {row.days} {row.days === 1 ? 'day' : 'days'}
@@ -99,11 +103,16 @@ function Row({ row, currency, today }: { row: QueueRow; currency: string; today:
       )}
 
       {p.status === 'requested' && mode === 'none' && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={() => setMode('approve')}>Approve</Button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {!startPassed && <Button onClick={() => setMode('approve')}>Approve</Button>}
           <Button variant="secondary" onClick={() => setMode('reject')}>
             Reject
           </Button>
+          {startPassed && (
+            <span className="text-[12px] text-muted-foreground">
+              Its first day has passed, so it cannot run as asked. Reject it, and the partner can ask again.
+            </span>
+          )}
         </div>
       )}
 

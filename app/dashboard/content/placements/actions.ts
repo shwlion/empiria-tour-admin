@@ -13,6 +13,7 @@ import {
   placementDays,
   readDeck,
   shownOnLandingPage,
+  todayInSellerCalendar,
 } from '@/lib/admin/placements';
 
 /**
@@ -80,6 +81,16 @@ export async function approvePlacementAction(
     if (!placement) return fail('That request no longer exists.');
     if (placement.status !== 'requested') {
       return fail(`That request is already ${placement.status}. Reload the page to see where it stands.`);
+    }
+    // A window whose first day has gone cannot run as asked, and a price
+    // frozen for it would bill for days that never ran. Refused rather than
+    // quietly shortened: the dates are the partner's, and so is the choice of
+    // asking again for the days that are left.
+    if (placement.startsOn < todayInSellerCalendar()) {
+      return fail(
+        `That request starts on ${placement.startsOn}, which has passed, so it cannot run as asked. ` +
+          'Reject it, and the partner can ask again for the days still to come.'
+      );
     }
 
     const days = placementDays(placement.startsOn, placement.endsOn);

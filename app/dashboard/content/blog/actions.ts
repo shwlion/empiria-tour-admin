@@ -179,7 +179,7 @@ export async function unpublishBlogPostAction(
 }
 
 /**
- * Permanent, and it takes the uploaded pictures with it.
+ * Permanent, and it takes the author's own uploaded pictures with it.
  *
  * The audit entry keeps the whole row rather than a diff: after this runs the
  * row is the only place the post existed, and a summary line is not a record.
@@ -191,7 +191,24 @@ export async function deleteBlogPostAction(id: string): Promise<ActionResult> {
     const { data: before } = await db.from('blog_posts').select('*').eq('id', id).maybeSingle();
     if (!before) return fail('That post no longer exists.');
 
-    const objects = blogObjectPathsIn(before.hero_image, before.body);
+    // The pictures are found in the post's content, which may carry any public
+    // address in the bucket — another author's picture copied from their live
+    // post, for one — and the removal runs as the service role. So only the
+    // author's own uploads (`<author_id>/…`, see blogObjectPath) are taken, and
+    // of those only the ones no other post still shows.
+    const own = blogObjectPathsIn(before.hero_image, before.body).filter((path) =>
+      path.startsWith(`${before.author_id}/`)
+    );
+    let objects = own;
+    if (own.length) {
+      const { data: others, error: othersError } = await db
+        .from('blog_posts')
+        .select('hero_image, body')
+        .neq('id', id);
+      if (othersError) throw othersError;
+      const stillShown = new Set((others ?? []).flatMap((p) => blogObjectPathsIn(p.hero_image, p.body)));
+      objects = own.filter((path) => !stillShown.has(path));
+    }
 
     const { error } = await db.from('blog_posts').delete().eq('id', id);
     if (error) return fail(explain(error));

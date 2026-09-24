@@ -2185,6 +2185,7 @@ export type Database = {
           phone: string | null
           registered: boolean | null
           since: string | null
+          unconverted_bookings: number | null
           user_id: string | null
         }
         Relationships: []

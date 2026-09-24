@@ -89,12 +89,17 @@ export async function getApplication(id: string): Promise<ApplicationDetail | nu
     .maybeSingle();
   if (!a) return null;
 
-  // Matched on the normalised address the submit function stored.
-  const { data: existing } = await db
+  // Matched exactly, on the lowercased address the submit function stored
+  // (Supabase Auth lowercases the ones it keeps). Not ilike: there '_' and '%'
+  // are wildcards, and '_' is common in addresses — j_doe@ would find jadoe@,
+  // and approving would promote somebody who never applied. A failed lookup
+  // throws rather than reading as "no account", which would mean inviting.
+  const { data: existing, error: accountError } = await db
     .from('users')
     .select('id, role, full_name, created_at')
-    .ilike('email', a.email)
+    .eq('email', a.email.toLowerCase())
     .maybeSingle();
+  if (accountError) throw accountError;
 
   let reviewedByEmail: string | null = null;
   if (a.reviewed_by) {

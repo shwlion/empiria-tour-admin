@@ -44,8 +44,11 @@ export async function inviteStaffAction(
     // Somebody may already be here as a traveller — they booked a holiday
     // before they were hired. Promote that account rather than failing on a
     // duplicate address, which is the shape of the error Supabase would give.
-    const { data: existing } = await db
-      .from('users').select('id, role, status').ilike('email', email).maybeSingle();
+    // Matched exactly: addresses are stored lowercased, and under ilike the
+    // '_' in j_doe@ is a wildcard that finds jadoe@ and hands them the role.
+    const { data: existing, error: lookupError } = await db
+      .from('users').select('id, role, status').eq('email', email).maybeSingle();
+    if (lookupError) throw lookupError;
 
     let userId: string;
     if (existing) {

@@ -348,6 +348,7 @@ export type Database = {
       }
       bookings: {
         Row: {
+          access_token: string
           adults: number
           amount_paid_cents: number
           balance_cents: number | null
@@ -386,6 +387,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          access_token?: string
           adults?: number
           amount_paid_cents?: number
           balance_cents?: number | null
@@ -424,6 +426,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          access_token?: string
           adults?: number
           amount_paid_cents?: number
           balance_cents?: number | null
@@ -2284,6 +2287,7 @@ export type Database = {
       create_booking: {
         Args: { p_payload: Json }
         Returns: {
+          access_token: string
           adults: number
           amount_paid_cents: number
           balance_cents: number | null
@@ -2340,6 +2344,10 @@ export type Database = {
       enqueue_due_reminders: { Args: never; Returns: number }
       enqueue_email: { Args: { p_payload: Json }; Returns: string }
       expire_stale_holds: { Args: { p_departure?: string }; Returns: number }
+      extend_booking_hold: {
+        Args: { p_booking: string; p_until: string }
+        Returns: string
+      }
       extend_hold: {
         Args: { p_hold: string; p_session: string }
         Returns: string
@@ -2373,6 +2381,7 @@ export type Database = {
       record_payment: {
         Args: { p_payload: Json }
         Returns: {
+          access_token: string
           adults: number
           amount_paid_cents: number
           balance_cents: number | null

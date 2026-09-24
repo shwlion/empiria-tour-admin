@@ -5,8 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
-import { cents, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
+import { checkbox, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
+import { formatPrice } from '@/lib/money';
 import { RESENDABLE } from '@/lib/admin/emails';
+import { parseAmount } from '@/lib/admin/bookings';
 
 /**
  * The three writes B3 actually owns.
@@ -79,7 +81,10 @@ export async function recordManualPaymentAction(
     return fail('Choose what kind of payment this is.', { kind: 'Required' });
   }
 
-  const magnitude = cents(form.get('amount'));
+  const magnitude = parseAmount(text(form.get('amount')));
+  if (magnitude == null) {
+    return fail('Enter the amount as a number, like 1850.00.', { amount: 'Like 1850.00' });
+  }
   if (magnitude <= 0) {
     return fail('The amount has to be more than zero.', { amount: 'Enter an amount' });
   }
@@ -90,6 +95,35 @@ export async function recordManualPaymentAction(
 
   try {
     const db = requireWritableDb();
+
+    // Bounded by the booking as it stands. A refund cannot give back more than
+    // was paid: record_payment has no floor, and the booking would show a
+    // negative amount paid and more outstanding than its total. A payment
+    // larger than what is owed is nearly always a slipped digit, and one that
+    // could only be undone by recording a refund that never happened, so it
+    // is recorded only once staff confirm the excess really arrived.
+    const { data: current } = await db
+      .from('bookings')
+      .select('total_cents, amount_paid_cents, currency')
+      .eq('id', bookingId)
+      .maybeSingle();
+    if (!current) return fail('That booking no longer exists.');
+    const outstanding = Math.max(current.total_cents - current.amount_paid_cents, 0);
+    if (kind === 'refund' && magnitude > current.amount_paid_cents) {
+      const paid = formatPrice(Math.max(current.amount_paid_cents, 0), current.currency);
+      return fail(`Only ${paid} has been paid on this booking, so no more than that can be refunded.`, {
+        amount: `At most ${paid}`,
+      });
+    }
+    if (kind !== 'refund' && magnitude > outstanding && !checkbox(form.get('overpaid'))) {
+      return fail(
+        `That is more than the ${formatPrice(outstanding, current.currency)} outstanding. If that much really arrived, ` +
+          'tick "More than is owed" and record it again, then refund the difference.',
+        { amount: 'More than is outstanding', overpaid: 'Confirm' }
+      );
+    }
+
+    const providerRef = `manual_${randomUUID()}`;
     const { data: booking, error } = await db.rpc('record_payment', {
       p_payload: {
         booking_id: bookingId,
@@ -97,7 +131,7 @@ export async function recordManualPaymentAction(
         amount_cents: amount,
         status: 'succeeded',
         provider: 'manual',
-        provider_ref: `manual_${randomUUID()}`,
+        provider_ref: providerRef,
         recorded_by: user.id,
       },
     });
@@ -138,10 +172,17 @@ export async function saveSupplierCostAction(
 ): Promise<ActionResult> {
   const user = await requireCapability('viewFinance');
 
+  // Empty means "not known yet", which the statement counts as a caveat.
+  // Anything else must be a real amount: a cost of zero is a costed booking.
   const raw = text(form.get('supplier_cost'));
-  const value = raw === '' ? null : cents(form.get('supplier_cost'));
-  if (value != null && value < 0) {
+  if (raw.startsWith('-')) {
     return fail('Supplier cost cannot be negative.', { supplier_cost: 'Zero or more' });
+  }
+  const value = raw === '' ? null : parseAmount(raw);
+  if (raw !== '' && value == null) {
+    return fail('Enter the cost as a number, like 1850.00, or leave it empty until it is known.', {
+      supplier_cost: 'Like 1850.00',
+    });
   }
 
   try {

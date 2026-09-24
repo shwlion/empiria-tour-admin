@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Banner, Field, Input, Select, SubmitButton, Textarea, inputClass } from '@/components/ui';
+import { Banner, Checkbox, Field, Input, Select, SubmitButton, Textarea, inputClass } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import {
   recordManualPaymentAction,
@@ -93,6 +93,19 @@ export function ManualPaymentForm({
           />
         </Field>
       </div>
+      {/* Offered only after the action has refused an amount above what is
+          outstanding: an overpayment is real money, but far more often a
+          slipped digit. */}
+      {fields.overpaid && (
+        <div className="mt-3">
+          <Checkbox
+            id="overpaid"
+            name="overpaid"
+            label="More than is owed"
+            hint="Record the whole amount that arrived. The excess is then owed back to the traveller."
+          />
+        </div>
+      )}
       <div className="mt-3">
         <Field
           label="Note"

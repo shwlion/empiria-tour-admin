@@ -11,6 +11,21 @@ import { getSupabaseAdmin } from '@/lib/supabase';
  * the server actions, not here.
  */
 
+/**
+ * An amount as staff type it — "1850", "1850.00", "1,850.00", "$1,850" — in
+ * cents, or null for anything else. Stricter than the shared `cents()`, which
+ * keeps only digits, dots and minus signs: it read "1e3" as 13.00, "1.850,00"
+ * as 1.85, and "tbc" as a supplier cost of zero, which counted the booking as
+ * costed and cleared the statement's caveat. Money is refused, not guessed at.
+ */
+export function parseAmount(raw: string): number | null {
+  const m = /^\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/.exec(raw);
+  if (!m) return null;
+  const cents = Number(m[1].replace(/,/g, '')) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  // The columns are 32-bit; anything past that is a typing slip, not a price.
+  return cents <= 2_147_483_647 ? cents : null;
+}
+
 /** Statuses that mean somebody is actually travelling. */
 export const TRAVELLING_STATUSES = ['confirmed', 'balance_due', 'paid_in_full', 'travelled'] as const;
 

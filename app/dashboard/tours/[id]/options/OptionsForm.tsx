@@ -210,6 +210,12 @@ export default function OptionsForm({
               <input type="hidden" name="field_id" value={field.id} />
               <input type="hidden" name="field_key" value={field.key} />
               <input type="hidden" name="field_required" value={String(field.isRequired)} />
+              {/* The choices travel here rather than in the input below, which
+                  is disabled for every type but "choose one" — and a disabled
+                  control is left out of the form's data altogether. The action
+                  reads each list by row position, so a missing entry handed
+                  every later question's choices to the one before it. */}
+              <input type="hidden" name="field_options" value={(field.options ?? []).join(', ')} />
               <Field label="Question" htmlFor={`field_label_${field.rowKey}`}>
                 <Input
                   id={`field_label_${field.rowKey}`} name="field_label" value={field.label} placeholder="Passport number"
@@ -239,7 +245,7 @@ export default function OptionsForm({
               </Field>
               <Field label="Choices" htmlFor={`field_options_${field.rowKey}`} hint="Comma separated, for “choose one”.">
                 <Input
-                  id={`field_options_${field.rowKey}`} name="field_options" value={(field.options ?? []).join(', ')}
+                  id={`field_options_${field.rowKey}`} value={(field.options ?? []).join(', ')}
                   disabled={field.fieldType !== 'dropdown'}
                   onChange={(e) => setFields((fs) => fs.map((f, j) => (j === i ? { ...f, options: e.target.value.split(',').map((o) => o.trim()) } : f)))}
                 />

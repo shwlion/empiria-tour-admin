@@ -414,13 +414,17 @@ export async function saveOptionsAction(
 
     for (let i = 0; i < fieldLabels.length; i++) {
       if (!fieldLabels[i]) continue;
+      const fieldType = text(form.getAll('field_type')[i]) || 'text';
       const optionsRaw = text(form.getAll('field_options')[i]);
       const row = {
         package_id: packageId,
         key: slugify(text(form.getAll('field_key')[i]) || fieldLabels[i]).replace(/-/g, '_'),
         label: fieldLabels[i],
-        field_type: text(form.getAll('field_type')[i]) || 'text',
-        options: optionsRaw ? optionsRaw.split(',').map((o) => o.trim()).filter(Boolean) : null,
+        field_type: fieldType,
+        // Choices belong to a dropdown alone. The form keeps them while a
+        // question's type is switched back and forth, so they are dropped here.
+        options:
+          fieldType === 'dropdown' && optionsRaw ? optionsRaw.split(',').map((o) => o.trim()).filter(Boolean) : null,
         is_required: form.getAll('field_required').map((v) => text(v))[i] === 'true',
         applies_to: text(form.getAll('field_applies')[i]) === 'traveller' ? 'traveller' : 'booking',
         sort_order: keptFields.length,

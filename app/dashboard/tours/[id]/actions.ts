@@ -195,31 +195,66 @@ export async function saveItineraryAction(
     const descriptions = form.getAll('day_description');
     const images = form.getAll('day_image');
 
-    const kept: string[] = [];
+    // The days this tour has now. Only these ids are updated: an id from any
+    // other tour is saved here as a new day rather than moved over from there.
+    const { data: current, error: readError } = await db
+      .from('itinerary_days')
+      .select('id, position')
+      .eq('package_id', packageId);
+    if (readError) throw readError;
+    const had = new Map((current ?? []).map((d) => [d.id, d.position]));
+
+    // The days in the form's order, numbered from 1. A day whose title was
+    // cleared goes, like one that was removed.
+    type Day = {
+      id: string | null;
+      row: { package_id: string; position: number; title: string; description: string | null; image: string | null };
+    };
+    const days: Day[] = [];
     for (let i = 0; i < titles.length; i++) {
       if (!titles[i]) continue;
-      const row = {
-        package_id: packageId,
-        position: kept.length + 1,
-        title: titles[i],
-        description: nullable(descriptions[i]),
-        image: nullable(images[i]),
-      };
-      if (ids[i]) {
-        const { error } = await db.from('itinerary_days').update(row).eq('id', ids[i]);
-        if (error) throw error;
-        kept.push(ids[i]);
-      } else {
-        const { data, error } = await db.from('itinerary_days').insert(row).select('id').single();
-        if (error) throw error;
-        kept.push(data.id);
-      }
+      days.push({
+        id: had.has(ids[i]) ? ids[i] : null,
+        row: {
+          package_id: packageId,
+          position: days.length + 1,
+          title: titles[i],
+          description: nullable(descriptions[i]),
+          image: nullable(images[i]),
+        },
+      });
     }
 
-    let del = db.from('itinerary_days').delete().eq('package_id', packageId);
-    if (kept.length) del = del.not('id', 'in', `(${kept.join(',')})`);
-    const { error: delError } = await del;
-    if (delError) throw delError;
+    // (package_id, position) is unique, checked row by row, and each write is
+    // its own statement — so numbering in place collides whenever a day moves
+    // up or one before it goes: the day moving into a slot is written while
+    // the day leaving it still holds it. Hence three steps. Removed days go
+    // first. Every day changing number is then parked below every number in
+    // use, each on its own. Only then are the final numbers written, when
+    // nothing else holds any of them. A save interrupted between the last two
+    // steps leaves parked numbers behind, and the next save puts them right.
+    const kept = new Set(days.flatMap((d) => (d.id ? [d.id] : [])));
+    const removed = [...had.keys()].filter((id) => !kept.has(id));
+    if (removed.length) {
+      const { error } = await db.from('itinerary_days').delete().eq('package_id', packageId).in('id', removed);
+      if (error) throw error;
+    }
+    let parking = Math.min(0, ...had.values());
+    for (const day of days) {
+      if (!day.id || had.get(day.id) === day.row.position) continue;
+      const { error } = await db
+        .from('itinerary_days')
+        .update({ position: --parking })
+        .eq('id', day.id)
+        .eq('package_id', packageId);
+      if (error) throw error;
+    }
+    for (const day of days) {
+      const { error } = day.id
+        ? await db.from('itinerary_days').update(day.row).eq('id', day.id).eq('package_id', packageId)
+        : await db.from('itinerary_days').insert(day.row);
+      if (error) throw error;
+    }
 
     // Inclusions and exclusions are two lists of plain lines with nothing
     // referencing them, so they are simply replaced.
@@ -237,7 +272,7 @@ export async function saveItineraryAction(
 
     await recordAudit(db, user, {
       entity: 'itinerary_days', entityId: packageId, action: 'update',
-      summary: `${kept.length} ${kept.length === 1 ? 'day' : 'days'}, ${included.length} included, ${excluded.length} excluded`,
+      summary: `${days.length} ${days.length === 1 ? 'day' : 'days'}, ${included.length} included, ${excluded.length} excluded`,
     });
 
     revalidatePath(`/dashboard/tours/${packageId}/itinerary`);

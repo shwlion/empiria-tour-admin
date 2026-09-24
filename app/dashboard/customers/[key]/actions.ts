@@ -42,14 +42,27 @@ export async function saveCustomerAction(
 
     const { data: before } = await db
       .from('users')
-      .select('id, role, full_name, phone, address, marketing_opt_in')
+      .select('id, role, status, full_name, phone, address, marketing_opt_in')
       .eq('id', userId)
       .maybeSingle();
     if (!before) return fail('That account no longer exists.');
     if (before.role !== 'traveller') return fail('Staff and partner accounts are edited under Settings, not here.');
+    // The record page hides this form once an account is closed, but a page
+    // left open while its traveller closed the account still posts. Writing
+    // it would put back the name, phone and address that closure erased, so
+    // the update itself carries the same conditions and is refused if either
+    // stopped holding since the read.
+    if (before.status === 'closed') return fail('This account has been closed, so its details can no longer be edited.');
 
-    const { error } = await db.from('users').update(next).eq('id', userId);
+    const { data: saved, error } = await db
+      .from('users')
+      .update(next)
+      .eq('id', userId)
+      .eq('role', 'traveller')
+      .neq('status', 'closed')
+      .select('id');
     if (error) throw error;
+    if (!saved?.length) return fail('This account was closed or changed while the page was open. Nothing was saved.');
 
     const changed = diff(
       { full_name: before.full_name, phone: before.phone, address: before.address, marketing_opt_in: before.marketing_opt_in },

@@ -62,10 +62,15 @@ const EMPTY: PlatformSettings = {
 /**
  * Parse whatever is in the `tax_rates` jsonb, discarding anything malformed.
  *
- * The storefront's `lib/pricing.ts` has the same guard for the same reason: an
- * unlabelled or negative rule becomes an unexplained charge on an invoice, and
- * dropping it is the safer failure. Kept in step with that module by hand —
- * the cost of the two apps being separate repositories.
+ * The storefront's `lib/pricing.ts` has the same guard for the same reason: a
+ * rule the pricing engine cannot read exactly — no label, a kind or basis it
+ * does not know, a value that is not a number, a percentage above 100,
+ * fractional cents — would be a guess on an invoice, and dropping it is the
+ * safer failure. A basis typed `per-person` used to be read as `percent`,
+ * which made a 350-cent levy a 350% charge. Kept identical to that module by
+ * hand — the cost of the two apps being separate repositories — so this screen
+ * lists exactly the rules the storefront charges. A hand-edited rule it cannot
+ * read is therefore not shown here, and saving the form leaves it out.
  */
 export function parseTaxRules(raw: unknown): TaxRuleRow[] {
   if (!Array.isArray(raw)) return [];
@@ -74,14 +79,25 @@ export function parseTaxRules(raw: unknown): TaxRuleRow[] {
     if (!item || typeof item !== 'object') continue;
     const r = item as Record<string, unknown>;
     const label = typeof r.label === 'string' ? r.label.trim() : '';
-    const value = typeof r.value === 'number' ? r.value : Number(r.value);
-    if (!label || !Number.isFinite(value) || value < 0) continue;
-    out.push({
-      label,
-      kind: r.kind === 'fee' ? 'fee' : 'tax',
-      basis: r.basis === 'per_booking' || r.basis === 'per_person' ? r.basis : 'percent',
-      value,
-    });
+    // A number, or a number written as text — never true, null or [], which
+    // Number() would quietly read as 1 or 0.
+    const value =
+      typeof r.value === 'number'
+        ? r.value
+        : typeof r.value === 'string' && r.value.trim() !== ''
+          ? Number(r.value)
+          : NaN;
+    const kind = r.kind === 'tax' || r.kind === 'fee' ? r.kind : null;
+    const basis =
+      r.basis === 'percent' || r.basis === 'per_booking' || r.basis === 'per_person'
+        ? r.basis
+        : null;
+    // A rule with no label, an unknown kind or basis, or a nonsense value would
+    // appear on an invoice as an unexplained charge. Dropping it is the safer
+    // failure.
+    if (!label || !kind || !basis || !Number.isFinite(value) || value < 0) continue;
+    if (basis === 'percent' ? value > 100 : !Number.isInteger(value)) continue;
+    out.push({ label, kind, basis, value });
   }
   return out;
 }

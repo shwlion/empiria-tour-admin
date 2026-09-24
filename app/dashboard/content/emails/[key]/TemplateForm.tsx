@@ -6,11 +6,11 @@ import { ArrowLeft } from 'lucide-react';
 import { Banner, Card, Checkbox, Field, Input, SubmitButton, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import type { EmailTemplate } from '@/lib/admin/content';
-import { saveEmailTemplateAction } from '../../actions';
+import { saveTemplateAction } from './actions';
 
 export default function TemplateForm({ template }: { template: EmailTemplate }) {
   const [state, formAction] = useActionState<ActionResult | null, FormData>(
-    saveEmailTemplateAction.bind(null, template.key),
+    saveTemplateAction.bind(null, template.key),
     null
   );
   const err = (k: string) => (state && !state.ok ? state.fields?.[k] : undefined);
@@ -66,23 +66,24 @@ export default function TemplateForm({ template }: { template: EmailTemplate }) 
           <Field
             label="Plain text alternative"
             htmlFor="body_text"
+            error={err('body_text')}
             hint="Optional but worth writing. Some clients show it, and spam filters like seeing it."
           >
-            <Textarea id="body_text" name="body_text" rows={6} defaultValue={template.bodyText ?? ''} className="font-mono text-[13px]" />
+            <Textarea id="body_text" name="body_text" rows={6} defaultValue={template.bodyText ?? ''} error={Boolean(err('body_text'))} className="font-mono text-[13px]" />
           </Field>
 
           <Checkbox
             name="is_active"
             defaultChecked={template.isActive}
             label="Send this email"
-            hint="Turn off to stop it going out without losing what it says."
+            hint="Turn off to stop it going out without losing what it says. Nothing is saved up to send later, but the balance and pre-departure reminders go out for any booking still due once it is back on."
           />
         </div>
       </Card>
 
       <Card
         title="Merge fields"
-        description="Written in double braces. Anything not on this list will not be filled in — it will arrive in the email exactly as typed."
+        description="Written in double braces. A field on this list is filled in; any other name is refused when you save, because an email that names one fails rather than sends. Braces around something that is not a field name at all, like {{booking-ref}}, arrive as typed."
       >
         <ul className="flex flex-wrap gap-1.5">
           {template.mergeFields.map((f) => (

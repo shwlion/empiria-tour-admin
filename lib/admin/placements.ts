@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { dateIn, REPORT_TIMEZONE } from '@/lib/admin/reports';
 
 /**
  * Paid promotion of the landing-page postcards (migration 0021).
@@ -22,6 +23,24 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 /** Migration 0021's check constraints, so a form can refuse before the database has to. */
 export const PLACEMENT_LIMITS = { title: 60, kicker: 40, description: 140 } as const;
+
+/**
+ * Today, in the seller's calendar.
+ *
+ * A placement is sold in whole days and its dates are compared as dates, so
+ * "today" has to be one particular calendar's. It is Toronto's: the
+ * storefront's `getShowcaseCards` decides what is live by it, and B5's
+ * reports cut their periods by the same clock (`REPORT_TIMEZONE`). The UTC
+ * date that `toISOString()` gives runs a day ahead of Toronto from 8 p.m.
+ * (7 p.m. in winter), and for those hours the console and the landing page
+ * disagreed about which day it was.
+ *
+ * Computed on the server and handed to client components as a prop, so the
+ * browser's clock never enters into it.
+ */
+export function todayInSellerCalendar(now: Date = new Date()): string {
+  return dateIn(now, REPORT_TIMEZONE);
+}
 
 /** The longest window one request may buy, in days. Empiria can always approve two. */
 export const MAX_PLACEMENT_DAYS = 120;

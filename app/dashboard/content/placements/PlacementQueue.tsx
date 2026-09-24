@@ -27,7 +27,7 @@ const day = (iso: string) =>
  * is what this page is for; rejecting asks for a reason in the same row rather
  * than a dialog, so the reason is written while the request is still on screen.
  */
-function Row({ row, currency }: { row: QueueRow; currency: string }) {
+function Row({ row, currency, today }: { row: QueueRow; currency: string; today: string }) {
   const p = row.placement;
   const [mode, setMode] = useState<'none' | 'approve' | 'reject' | 'cancel'>('none');
 
@@ -47,9 +47,8 @@ function Row({ row, currency }: { row: QueueRow; currency: string }) {
 
   // An approval that was never paid and whose hold date has passed is holding
   // days against everybody else. Nothing expires it automatically, so the
-  // console is what makes it visible.
-  const stale =
-    p.status === 'approved' && p.holdUntil != null && p.holdUntil < new Date().toISOString().slice(0, 10);
+  // console is what makes it visible. `today` is Toronto's, from the server.
+  const stale = p.status === 'approved' && p.holdUntil != null && p.holdUntil < today;
 
   return (
     <div className="border-b border-border px-4 py-4 last:border-0">
@@ -186,7 +185,16 @@ function Row({ row, currency }: { row: QueueRow; currency: string }) {
   );
 }
 
-export default function PlacementQueue({ rows, currency }: { rows: QueueRow[]; currency: string }) {
+export default function PlacementQueue({
+  rows,
+  currency,
+  today,
+}: {
+  rows: QueueRow[];
+  currency: string;
+  /** Today in the seller's calendar (YYYY-MM-DD), computed on the server. */
+  today: string;
+}) {
   const pending = rows.filter((r) => r.placement.status === 'requested');
   const settled = rows.filter((r) => r.placement.status !== 'requested');
 
@@ -196,7 +204,7 @@ export default function PlacementQueue({ rows, currency }: { rows: QueueRow[]; c
         <Card title="Awaiting a decision" description="Oldest first — whoever asked first should be answered first.">
           <div className="-mx-4 -mb-4">
             {pending.map((r) => (
-              <Row key={r.placement.id} row={r} currency={currency} />
+              <Row key={r.placement.id} row={r} currency={currency} today={today} />
             ))}
           </div>
         </Card>
@@ -205,7 +213,7 @@ export default function PlacementQueue({ rows, currency }: { rows: QueueRow[]; c
         <Card title="Decided" description="Approved, paid, rejected and released placements, newest first.">
           <div className="-mx-4 -mb-4">
             {settled.map((r) => (
-              <Row key={r.placement.id} row={r} currency={currency} />
+              <Row key={r.placement.id} row={r} currency={currency} today={today} />
             ))}
           </div>
         </Card>

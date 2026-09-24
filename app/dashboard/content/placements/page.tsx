@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { PageHeader, Banner, Card, EmptyState } from '@/components/ui';
 import { requireCapability } from '@/lib/auth';
 import { formatPrice } from '@/lib/money';
-import { listPlacements, listSellableCards, quoteCents, placementDays } from '@/lib/admin/placements';
+import { listPlacements, listSellableCards, quoteCents, placementDays, todayInSellerCalendar } from '@/lib/admin/placements';
 import PlacementQueue from './PlacementQueue';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +35,7 @@ export default async function PlacementsPage() {
     listSellableCards(),
   ]);
   const placements = read ?? [];
+  const today = todayInSellerCalendar();
 
   const sellable = cards.filter((c) => c.sellable);
   const pending = placements.filter((p) => p.status === 'requested');
@@ -113,7 +114,7 @@ export default async function PlacementsPage() {
           />
         </Card>
       ) : (
-        <PlacementQueue rows={rows} currency={currency} />
+        <PlacementQueue rows={rows} currency={currency} today={today} />
       )}
     </>
   );

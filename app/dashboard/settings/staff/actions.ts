@@ -74,14 +74,7 @@ export async function inviteStaffAction(
     });
     if (error) throw new Error(error.message);
 
-    if (name && !existing) {
-      await db.from('users').update({ full_name: name }).eq('id', userId);
-    }
-    // A closed account being re-invited is somebody coming back.
-    if (existing?.status === 'closed') {
-      await db.rpc('set_user_status', { p_user: userId, p_status: 'active', p_actor: user.id });
-    }
-
+    // Recorded as soon as it is true: the role is theirs whatever follows.
     await recordAudit(db, user, {
       entity: 'user',
       entityId: userId,
@@ -89,6 +82,28 @@ export async function inviteStaffAction(
       summary: `${existing ? 'Gave' : 'Invited'} ${email} the ${role} role`,
       after: { role },
     });
+
+    if (name && !existing) {
+      // Belt and braces: the invitation's metadata already put the name on the
+      // new row (handle_new_user), so a failure here costs nothing anybody
+      // needs to act on, and it must not report a sent invitation as unsent.
+      const { error: nameError } = await db.from('users').update({ full_name: name }).eq('id', userId);
+      if (nameError) console.error('[staff] name not saved', userId, nameError.message);
+    }
+    // A closed account being re-invited is somebody coming back, and reopening
+    // it is what actually lets them in — so a refusal here is the answer, not
+    // a detail. It comes after the role on purpose: failing, it leaves the
+    // account closed rather than open under the role it had before.
+    if (existing?.status === 'closed') {
+      const { error: statusError } = await db.rpc('set_user_status', {
+        p_user: userId, p_status: 'active', p_actor: user.id,
+      });
+      if (statusError) {
+        console.error('[action]', statusError.message);
+        revalidatePath('/dashboard/settings/staff');
+        return fail(`${email} has the ${role} role, but the account is still closed — reopening it failed. Try again.`);
+      }
+    }
 
     revalidatePath('/dashboard/settings/staff');
     return ok(undefined, existing

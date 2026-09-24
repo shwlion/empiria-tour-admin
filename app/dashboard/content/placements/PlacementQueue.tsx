@@ -179,7 +179,11 @@ function Row({ row, currency, today }: { row: QueueRow; currency: string; today:
               nothing — settle that with the partner directly.
             </Banner>
           )}
-          <Field label="Note" htmlFor={`cnote-${p.id}`}>
+          <Field
+            label="Note to the partner"
+            htmlFor={`cnote-${p.id}`}
+            hint="They see it beside the cancellation. Left empty, the note they already have stays."
+          >
             <Input id={`cnote-${p.id}`} name="note" placeholder="Optional" />
           </Field>
           <div className="flex gap-2">

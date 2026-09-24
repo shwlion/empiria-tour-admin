@@ -46,7 +46,10 @@ const CHANGED = 'That request changed while you were deciding. Reload the page t
  *
  * The price is frozen here for the same reason a booking freezes its own: what
  * was agreed is what is owed, whatever the rate card does afterwards. The
- * partner is quoted this number and pays exactly it.
+ * partner is quoted this number and pays exactly it — in the currency it was
+ * typed in, which is the platform's: the queue quotes the rate card in the
+ * default currency, so that is what is frozen beside the price. Left to the
+ * column's default, every approval said CAD whatever Empiria had quoted in.
  *
  * The overlap check below is a courtesy that produces a readable error. The
  * *rule* is 0021's exclusion constraint, which is why the UPDATE is attempted
@@ -117,11 +120,21 @@ export async function approvePlacementAction(
     }
 
     const db = requireWritableDb();
+    // Read here, not taken from the form: a hidden field is a suggestion.
+    const { data: settings, error: settingsError } = await db
+      .from('platform_settings')
+      .select('default_currency')
+      .eq('id', true)
+      .maybeSingle();
+    if (settingsError) throw settingsError;
+    const currency = settings?.default_currency ?? 'CAD';
+
     const { data: changed, error } = await db
       .from('showcase_placements')
       .update({
         status: 'approved',
         price_cents: priceCents,
+        currency,
         hold_until: holdUntil,
         note: text(form.get('note')) || null,
         decided_by: user.id,
@@ -146,8 +159,8 @@ export async function approvePlacementAction(
       entity: 'showcase_placement',
       entityId: placementId,
       action: 'update',
-      before: { status: 'requested', price_cents: placement.priceCents },
-      after: { status: 'approved', price_cents: priceCents },
+      before: { status: 'requested', price_cents: placement.priceCents, currency: placement.currency },
+      after: { status: 'approved', price_cents: priceCents, currency },
       summary: `Approved “${placement.cardTitle}” for ${placement.partnerName}, ${placement.startsOn} to ${placement.endsOn}`,
     });
 

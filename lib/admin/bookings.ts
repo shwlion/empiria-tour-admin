@@ -14,6 +14,23 @@ import { STOREFRONT_URL } from '@/lib/storefront';
  */
 
 /**
+ * `record_payment` appends a line starting with this to the internal notes
+ * when money needs a person: it arrived after the places were released and
+ * they are gone, it arrived for a cancelled or refunded booking, or it
+ * overpaid the total (0023). The console lifts those lines out of the notes
+ * so they are not missed; they stop showing once staff edit them out.
+ */
+export const ACTION_NEEDED = 'ACTION NEEDED:';
+
+export function actionsNeeded(notes: string | null | undefined): string[] {
+  return (notes ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(ACTION_NEEDED))
+    .map((line) => line.slice(ACTION_NEEDED.length).trim());
+}
+
+/**
  * An amount as staff type it — "1850", "1850.00", "1,850.00", "$1,850" — in
  * cents, or null for anything else. Stricter than the shared `cents()`, which
  * keeps only digits, dots and minus signs: it read "1e3" as 13.00, "1.850,00"
@@ -55,6 +72,8 @@ export type BookingListRow = {
   packageId: string;
   packageTitle: string;
   departureStartsOn: string;
+  /** An ACTION NEEDED line sits in the internal notes. */
+  actionNeeded: boolean;
 };
 
 export type BookingListFilters = {
@@ -70,6 +89,7 @@ type ListJoined = {
   id: string; reference: string; status: string; lead_name: string; lead_email: string;
   adults: number; children: number; infants: number; total_cents: number;
   amount_paid_cents: number; currency: string; created_at: string; balance_due_on: string | null;
+  notes_internal: string | null;
   packages: { id: string; title: string; partner_id: string | null };
   departures: { starts_on: string };
 };
@@ -82,7 +102,7 @@ export async function listBookings(filters: BookingListFilters = {}): Promise<Bo
     .from('bookings')
     .select(
       'id, reference, status, lead_name, lead_email, adults, children, infants, ' +
-        'total_cents, amount_paid_cents, currency, created_at, balance_due_on, ' +
+        'total_cents, amount_paid_cents, currency, created_at, balance_due_on, notes_internal, ' +
         'packages!inner ( id, title, partner_id ), departures!inner ( starts_on )'
     )
     .order('created_at', { ascending: false })
@@ -121,6 +141,7 @@ export async function listBookings(filters: BookingListFilters = {}): Promise<Bo
     packageId: b.packages.id,
     packageTitle: b.packages.title,
     departureStartsOn: b.departures.starts_on,
+    actionNeeded: actionsNeeded(b.notes_internal).length > 0,
   }));
 }
 

@@ -162,6 +162,9 @@ export default async function BookingsPage({
                 <td className="px-4 py-3 tabular-nums text-foreground">{formatPrice(b.totalCents, b.currency)}</td>
                 <td className="px-4 py-3">
                   <Badge value={b.status} />
+                  {b.actionNeeded && (
+                    <div className="mt-0.5 text-[11px] font-semibold text-destructive">Action needed</div>
+                  )}
                 </td>
               </tr>
             );

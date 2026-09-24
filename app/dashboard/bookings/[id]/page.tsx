@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, CalendarRange } from 'lucide-react';
-import { Badge, Card, Table } from '@/components/ui';
+import { Badge, Banner, Card, Table } from '@/components/ui';
 import { formatDateRange, formatDepartureDate, formatPrice } from '@/lib/money';
 import { requireCapability } from '@/lib/auth';
-import { getBookingDetail } from '@/lib/admin/bookings';
+import { actionsNeeded, getBookingDetail } from '@/lib/admin/bookings';
 import { RESENDABLE, listEmailsForBooking } from '@/lib/admin/emails';
 import { formatEmergencyContact } from '@/lib/admin/manifests';
 import { ManualPaymentForm, NotesForm, ResendForm, SupplierCostForm } from './forms';
@@ -40,6 +40,7 @@ export default async function BookingDetailPage({
   if (!booking) notFound();
 
   const outstanding = Math.max(booking.totalCents - booking.amountPaidCents, 0);
+  const actions = actionsNeeded(booking.notesInternal);
   const bookingLevelResponses = booking.fieldResponses.filter((r) => !r.travellerId);
   const responsesByTraveller = new Map<string, typeof booking.fieldResponses>();
   for (const r of booking.fieldResponses) {
@@ -75,6 +76,18 @@ export default async function BookingDetailPage({
           booked {dateTime(booking.createdAt)}
         </p>
       </div>
+
+      {actions.length > 0 && (
+        <Banner tone="error">
+          <p className="font-semibold">This booking needs somebody to act on it.</p>
+          <ul className="mt-1 list-disc pl-4">
+            {actions.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+          <p className="mt-1">Once it is dealt with, take the line out of the internal notes below.</p>
+        </Banner>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">

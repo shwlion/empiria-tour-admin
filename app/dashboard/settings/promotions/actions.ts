@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
-import { cents, explain, fail, integer, nullable, ok, text, type ActionResult } from '@/lib/actions';
+import { cents, explain, fail, nullable, ok, text, type ActionResult } from '@/lib/actions';
 import { getPromotion, promotionProblems, type PromotionDraft } from '@/lib/admin/promotions';
 
 /**
@@ -36,14 +36,17 @@ function windowEnd(date: string | null): string | null {
 
 function readDraft(form: FormData): PromotionDraft {
   const discountType = text(form.get('discount_type')) === 'fixed' ? 'fixed' : 'percent';
-  const limit = (v: FormDataEntryValue | null) => (nullable(v) == null ? null : integer(v, -1));
+  // Read as numbers, not with integer(): that truncates, so "12.5" was stored
+  // as 12 and a limit of "2.5" as 2 without the whole-number checks in
+  // promotionProblems ever seeing the fraction they exist to refuse.
+  const limit = (v: FormDataEntryValue | null) => (nullable(v) == null ? null : Number(text(v)));
   return {
     // Uppercased and squeezed: the storefront matches case-insensitively, and
     // two codes that differ only in case would be one code with two counts.
     code: text(form.get('code')).toUpperCase().replace(/\s+/g, ''),
     description: nullable(form.get('description')),
     discountType,
-    discountValue: discountType === 'percent' ? integer(form.get('discount_value'), 0) : cents(form.get('discount_value'), 0),
+    discountValue: discountType === 'percent' ? Number(text(form.get('discount_value'))) : cents(form.get('discount_value'), 0),
     currency: text(form.get('currency')).toUpperCase() || 'CAD',
     validFrom: nullable(form.get('valid_from')),
     validUntil: nullable(form.get('valid_until')),

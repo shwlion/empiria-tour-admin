@@ -234,9 +234,20 @@ export function formatEmergencyContact(c: EmergencyContact): string {
  */
 export const CSV_BOM = '\uFEFF';
 
-/** RFC 4180 quoting: doubled quotes, wrapped when a comma, quote or newline appears. */
+/**
+ * RFC 4180 quoting: doubled quotes, wrapped when a comma, quote or newline
+ * appears.
+ *
+ * And no formulas. Names, dietary notes and custom-field answers are typed by
+ * travellers, and a cell that begins with = + - @ (or a tab or carriage
+ * return, which some spreadsheets strip first) is run as a formula when the
+ * operator opens the file. Such a cell gets a leading apostrophe, which
+ * spreadsheets take to mean "text", and is always quoted — the same rule as
+ * the partner dashboard's manifest (lib/console/manifest-csv.ts there).
+ */
 function csvCell(value: string | number | null | undefined): string {
   const s = value == null ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(s)) return `"'${s.replace(/"/g, '""')}"`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

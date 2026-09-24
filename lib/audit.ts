@@ -41,7 +41,10 @@ export async function recordAudit(
   entry: AuditEntry
 ): Promise<void> {
   try {
-    await db.from('audit_log').insert({
+    // supabase-js hands a refusal back in its result rather than throwing it,
+    // so the result is read; the catch below is for the request failing
+    // outright. Unread, a trail that had stopped recording would say nothing.
+    const { error } = await db.from('audit_log').insert({
       actor_id: actor.id,
       actor_email: actor.email,
       entity: entry.entity,
@@ -51,6 +54,7 @@ export async function recordAudit(
       after: (entry.after ?? null) as never,
       summary: entry.summary ?? null,
     });
+    if (error) console.error('[audit] failed to record', entry.entity, entry.action, error);
   } catch (error) {
     console.error('[audit] failed to record', entry.entity, entry.action, error);
   }

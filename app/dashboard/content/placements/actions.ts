@@ -23,6 +23,16 @@ import { conflictsFor, getPlacement, MAX_PLACEMENT_DAYS, placementDays } from '@
 const PATH = '/dashboard/content/placements';
 
 /**
+ * What a decision says when its guarded UPDATE matched no row. Each write is
+ * pinned to the status the decision was made against, so a row that moved in
+ * the meantime — another admin deciding, the partner withdrawing — is not
+ * matched. PostgREST reports that as success with nothing in it, so every
+ * write asks for the ids it changed and stops here when there are none,
+ * before an audit row can describe a change that never happened.
+ */
+const CHANGED = 'That request changed while you were deciding. Reload the page to see where it stands.';
+
+/**
  * Approve a request and fix its price.
  *
  * The price is frozen here for the same reason a booking freezes its own: what
@@ -74,7 +84,7 @@ export async function approvePlacementAction(
     }
 
     const db = requireWritableDb();
-    const { error } = await db
+    const { data: changed, error } = await db
       .from('showcase_placements')
       .update({
         status: 'approved',
@@ -85,7 +95,8 @@ export async function approvePlacementAction(
         decided_at: new Date().toISOString(),
       })
       .eq('id', placementId)
-      .eq('status', 'requested');   // lost race → zero rows, never a second approval
+      .eq('status', 'requested')   // lost race → zero rows, never a second approval
+      .select('id');
 
     if (error) {
       // 23P01 is exclusion_violation: another approval took these days between
@@ -96,6 +107,7 @@ export async function approvePlacementAction(
       }
       return fail(explain(error));
     }
+    if (!changed?.length) return fail(CHANGED);
 
     await recordAudit(db, user, {
       entity: 'showcase_placement',
@@ -137,9 +149,12 @@ export async function rejectPlacementAction(
     if (placement.status === 'paid') {
       return fail('That placement is paid for. Cancel it instead, and settle the refund outside the platform.');
     }
+    if (placement.status !== 'requested' && placement.status !== 'approved') {
+      return fail(`That request is already ${placement.status}. Reload the page to see where it stands.`);
+    }
 
     const db = requireWritableDb();
-    const { error } = await db
+    const { data: changed, error } = await db
       .from('showcase_placements')
       .update({
         status: 'rejected',
@@ -148,8 +163,10 @@ export async function rejectPlacementAction(
         decided_at: new Date().toISOString(),
       })
       .eq('id', placementId)
-      .in('status', ['requested', 'approved']);
+      .eq('status', placement.status)
+      .select('id');
     if (error) return fail(explain(error));
+    if (!changed?.length) return fail(CHANGED);
 
     await recordAudit(db, user, {
       entity: 'showcase_placement',
@@ -168,13 +185,18 @@ export async function rejectPlacementAction(
 }
 
 /**
- * Release an approved slot that was never paid for.
+ * Release an approved slot that was never paid for, or cancel a paid one.
  *
  * An approval holds days against every other partner, and nothing expires it
  * on its own — deliberately, because a slot quietly going back on sale while a
  * partner is arranging payment is worse than one an admin has to release. This
  * is that release, and the console flags approvals past their hold date so
  * nobody has to remember.
+ *
+ * Only an approved or a paid placement can be cancelled. The button is only
+ * offered for those, but a server action is a public endpoint, and without
+ * this a replayed form could turn a rejection — reason and all — into a
+ * "cancellation" the partner would read as their own withdrawal.
  */
 export async function cancelPlacementAction(
   placementId: string,
@@ -186,9 +208,15 @@ export async function cancelPlacementAction(
   try {
     const placement = await getPlacement(placementId);
     if (!placement) return fail('That request no longer exists.');
+    if (placement.status === 'requested') {
+      return fail('That request has not been approved, so there is nothing to release. Reject it instead.');
+    }
+    if (placement.status !== 'approved' && placement.status !== 'paid') {
+      return fail(`That request is already ${placement.status}. Reload the page to see where it stands.`);
+    }
 
     const db = requireWritableDb();
-    const { error } = await db
+    const { data: changed, error } = await db
       .from('showcase_placements')
       .update({
         status: 'cancelled',
@@ -196,8 +224,13 @@ export async function cancelPlacementAction(
         decided_by: user.id,
         decided_at: new Date().toISOString(),
       })
-      .eq('id', placementId);
+      .eq('id', placementId)
+      // Pinned to the status just read, so the summary and the message below
+      // (which differ for a paid placement) describe what actually happened.
+      .eq('status', placement.status)
+      .select('id');
     if (error) return fail(explain(error));
+    if (!changed?.length) return fail(CHANGED);
 
     await recordAudit(db, user, {
       entity: 'showcase_placement',

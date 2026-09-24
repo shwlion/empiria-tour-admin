@@ -33,7 +33,19 @@ export function formatDepartureDate(iso: string | null | undefined, locale = 'en
   });
 }
 
-/** "4–11 May 2027", collapsing the repeated month and year where possible. */
+/**
+ * A departure's dates, collapsing whatever the two ends share:
+ * "May 1–8, 2027", "May 28 – Jun 4, 2027", "Dec 28, 2027 – Jan 4, 2028".
+ *
+ * Composed by hand from `formatToParts`, not by `Intl.formatRange`. The range
+ * formatter's output differs between ICU builds — Bun renders "May 1 – 8"
+ * where Chrome renders "May 1–8" — so a server-rendered range never matched
+ * the client's and every page showing one hydrated with a text mismatch.
+ * Taking the locale's month names and day numbers from the parts, and doing
+ * the joining ourselves, gives one string everywhere. The month-day order is
+ * this function's (month first), which is right for the en-CA default and
+ * the only locale the storefront passes.
+ */
 export function formatDateRange(
   startIso: string | null | undefined,
   endIso: string | null | undefined,
@@ -42,26 +54,22 @@ export function formatDateRange(
   if (!startIso) return '';
   if (!endIso) return formatDepartureDate(startIso, locale);
 
-  const parse = (s: string) => {
-    const [y, m, d] = s.slice(0, 10).split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
+  // Plain calendar dates, as everywhere else in this file: a departure is a day,
+  // not an instant, and parsing it as one would shift it by the viewer's offset.
+  const pieces = (iso: string) => {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    const parts = new Intl.DateTimeFormat(locale, {
+      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+    }).formatToParts(new Date(Date.UTC(y, m - 1, d)));
+    const of = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    return { day: of('day'), month: of('month'), year: of('year') };
   };
-  const a = parse(startIso);
-  const b = parse(endIso);
-  const opts: Intl.DateTimeFormatOptions = { timeZone: 'UTC' };
+  const a = pieces(startIso);
+  const b = pieces(endIso);
 
-  const sameYear = a.getUTCFullYear() === b.getUTCFullYear();
-  const sameMonth = sameYear && a.getUTCMonth() === b.getUTCMonth();
-
-  if (sameMonth) {
-    return `${a.toLocaleDateString(locale, { ...opts, day: 'numeric' })}–${b.toLocaleDateString(
-      locale, { ...opts, day: 'numeric', month: 'short', year: 'numeric' })}`;
-  }
-  if (sameYear) {
-    return `${a.toLocaleDateString(locale, { ...opts, day: 'numeric', month: 'short' })} – ${b.toLocaleDateString(
-      locale, { ...opts, day: 'numeric', month: 'short', year: 'numeric' })}`;
-  }
-  return `${formatDepartureDate(startIso, locale)} – ${formatDepartureDate(endIso, locale)}`;
+  if (a.year === b.year && a.month === b.month) return `${a.month} ${a.day}–${b.day}, ${a.year}`;
+  if (a.year === b.year) return `${a.month} ${a.day} – ${b.month} ${b.day}, ${a.year}`;
+  return `${a.month} ${a.day}, ${a.year} – ${b.month} ${b.day}, ${b.year}`;
 }
 
 /** "3 left" / "Sold out" / null when there is nothing worth saying. */

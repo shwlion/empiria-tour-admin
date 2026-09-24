@@ -76,7 +76,8 @@ export function ColumnChart({
         const r = Math.min(4, thick / 2, h);
         const path = h === 0 ? '' : `M${x},${y(0)} v${-(h - r)} a${r},${r} 0 0 1 ${r},${-r} h${thick - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${h - r} z`;
         return (
-          <g key={p.label}>
+          // The full date (or week), not the label: two Mondays years apart share "09-01".
+          <g key={p.detail}>
             {h > 0 && <path d={path} fill={SERIES}><title>{`${p.detail}: ${format(p.valueCents)}`}</title></path>}
             {h === 0 && <rect x={x} y={y(0) - 1} width={thick} height={1} fill={GRID}><title>{`${p.detail}: ${format(0)}`}</title></rect>}
             {i % every === 0 && (
@@ -95,7 +96,8 @@ export function BarChart({
   rows,
   format,
 }: {
-  rows: { label: string; valueCents: number; count: number }[];
+  /** `id` keys the row: two tours can share a title. */
+  rows: { id: string; label: string; valueCents: number; count: number }[];
   format: (cents: number) => string;
 }) {
   const W = 720;
@@ -119,7 +121,7 @@ export function BarChart({
         const path = w <= 0 ? '' : `M${L},${yy} h${w - rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${18 - 2 * rr} a${rr},${rr} 0 0 1 ${-rr},${rr} h${-(w - rr)} z`;
         const name = r.label.length > 30 ? `${r.label.slice(0, 29)}…` : r.label;
         return (
-          <g key={r.label}>
+          <g key={r.id}>
             <text x={L - 10} y={yy + 13} textAnchor="end" fontSize={12} fill={INK}>{name}</text>
             {w > 0 && <path d={path} fill={SERIES}><title>{`${r.label}: ${format(r.valueCents)} across ${r.count} ${r.count === 1 ? 'booking' : 'bookings'}`}</title></path>}
             <text x={L + Math.max(w, 0) + 8} y={yy + 13} fontSize={11} fill={MUTED}>

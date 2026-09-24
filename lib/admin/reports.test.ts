@@ -1,4 +1,4 @@
-import { resolvePeriod, startOfDay, dateIn, computeMetrics, computeStatement, reportToCsv, type ReportBooking, type ReportPayment } from './reports';
+import { resolvePeriod, startOfDay, dateIn, computeMetrics, computeStatement, reportToCsv, isSale, csvCell, type ReportBooking, type ReportPayment } from './reports';
 
 /**
  * B5's arithmetic and its calendar.
@@ -86,6 +86,100 @@ eq('revenue share at 20%', s.revenueShareBaseCents, Math.round((180000 - 20000 -
 const csv = reportToCsv(resolvePeriod({}, NOW, TZ), 'CAD', m, s);
 eq('the CSV carries the statement', csv.includes('Revenue share at 20%,122.40'), true);
 eq('  …and the by-day rows', csv.split('\r\n').filter((l) => /^2026-09-\d\d,/.test(l)).length, 13);
+
+// ── the calendar refuses dates that do not exist ────────────────────────────
+eq('31 February is not a date: the range falls back to this month', resolvePeriod({ period: 'custom', from: '2026-02-31', to: '2026-02-31' }, NOW, TZ).key, 'month');
+eq('  …nor is 29 February in a common year', resolvePeriod({ period: 'custom', from: '2026-02-29', to: '2026-03-01' }, NOW, TZ).key, 'month');
+eq('  …but it is in a leap year', (({ key, fromDate }) => [key, fromDate])(resolvePeriod({ period: 'custom', from: '2024-02-29', to: '2024-03-01' }, NOW, TZ)), ['custom', '2024-02-29']);
+
+// ── what counts as a sale ────────────────────────────────────────────────────
+eq('a checkout whose hold lapsed (cancelled, nothing paid) is not a sale', isSale({ status: 'cancelled', amountPaidCents: 0 }), false);
+eq('  …a refunded booking still is', isSale({ status: 'refunded', amountPaidCents: 0 }), true);
+eq('  …and so is a cancelled booking still holding money', isSale({ status: 'cancelled', amountPaidCents: 5000 }), true);
+{
+  const lapsed = [booking({ id: 'x1' }), ...Array.from({ length: 40 }, (_, i) => booking({ id: `lapsed${i}`, status: 'cancelled', amountPaidCents: 0, balanceCents: 100000 }))];
+  const mm = computeMetrics(lapsed, [], [], period, TZ);
+  eq('forty abandoned checkouts add nothing to gross bookings', [mm.bookingsCount, mm.grossBookingsBaseCents, mm.uncostedBookings], [1, 100000, 0]);
+}
+
+// ── rounding never makes or loses a cent ─────────────────────────────────────
+// A $20 booking carrying 15 cents of tax: half of it is 7.5 cents.
+const half = { totalCents: 2000, taxCents: 15, supplierCostCents: null };
+{
+  const s1 = computeStatement([
+    pay({ bookingId: 'r', amountCents: 1000, processorFeeCents: 0, booking: half }),
+    pay({ bookingId: 'r', createdAt: '2026-09-06T15:05:00Z', kind: 'refund', amountCents: -1000, processorFeeCents: null, booking: half }),
+  ]);
+  eq('a payment refunded in full nets to exactly nothing', [s1.grossPaidBaseCents, s1.refundsBaseCents, s1.taxesRemittedBaseCents, s1.netPlatformProfitBaseCents], [1000, 1000, 0, 0]);
+  eq('  …and its revenue share is 0, not -0 (which printed "-$0")', Object.is(s1.revenueShareBaseCents, 0), true);
+}
+{
+  const fx = 1.3335; // 1000 × 1.3335 is exactly 1333.5
+  const both = [
+    pay({ bookingId: 'u', amountCents: 1000, processorFeeCents: 0, fx, booking: half }),
+    pay({ bookingId: 'u', createdAt: '2026-09-06T15:05:00Z', kind: 'refund', amountCents: -1000, processorFeeCents: null, fx, booking: half }),
+  ];
+  const s2 = computeStatement(both);
+  const m2 = computeMetrics([], both, [], period, TZ);
+  eq('a converted refund mirrors its payment to the cent', [s2.grossPaidBaseCents, s2.refundsBaseCents, s2.netPlatformProfitBaseCents], [1334, 1334, 0]);
+  eq('  …and the tiles agree with the statement', [m2.paymentsReceivedBaseCents, m2.refundsIssuedBaseCents], [s2.grossPaidBaseCents, s2.refundsBaseCents]);
+}
+{
+  const s3 = computeStatement([
+    pay({ bookingId: 'h', amountCents: 1000, processorFeeCents: 0, booking: half }),
+    pay({ bookingId: 'h', createdAt: '2026-09-07T15:05:00Z', kind: 'balance', amountCents: 1000, processorFeeCents: 0, booking: half }),
+  ]);
+  eq('two halves of a booking carry exactly its tax (15, not 8 + 8)', s3.taxesRemittedBaseCents, 15);
+  const sept = computeStatement([pay({ bookingId: 'h', amountCents: 1000, processorFeeCents: 0, booking: half })]);
+  const oct = computeStatement([pay({ bookingId: 'h', createdAt: '2026-10-07T15:05:00Z', kind: 'balance', amountCents: 1000, processorFeeCents: 0, booking: { ...half, paidBeforeCents: 1000 } })]);
+  eq('  …across two periods as well, because the second starts from the first', [sept.taxesRemittedBaseCents, oct.taxesRemittedBaseCents], [8, 7]);
+  const later = computeStatement([pay({ bookingId: 'h', createdAt: '2026-10-07T15:05:00Z', kind: 'refund', amountCents: -1000, processorFeeCents: null, fx: 1.3335, booking: { ...half, paidBeforeCents: 1000 } })]);
+  eq('  …and a refund in a later period gives back what its payment took', [later.refundsBaseCents, later.taxesRemittedBaseCents], [1334, -10]);
+  const split = computeStatement([
+    pay({ bookingId: 'v', amountCents: 1000, processorFeeCents: 0, fx: 1.3335, booking: half }),
+    pay({ bookingId: 'v', createdAt: '2026-09-07T15:05:00Z', kind: 'balance', amountCents: 1000, processorFeeCents: 0, fx: 1.3335, booking: half }),
+  ]);
+  eq('  …and a converted booking paid in two parts converts as a whole (2667, not 1334 + 1334)', split.grossPaidBaseCents, 2667);
+}
+{
+  const loss = computeStatement([pay({ bookingId: 'l', amountCents: 1000, processorFeeCents: 1002, booking: { totalCents: 1000, taxCents: 0, supplierCostCents: 0 } })]);
+  eq('a two-cent loss shares out as 0, not -0', [loss.netPlatformProfitBaseCents, Object.is(loss.revenueShareBaseCents, 0)], [-2, true]);
+}
+
+// ── a booking with no exchange rate is left out and counted, never taken at par
+{
+  const eur = booking({ id: 'e1', packageId: 'p3', packageTitle: 'Provence', destination: 'France', totalCents: 300000, taxCents: 0, supplierCostCents: null, amountPaidCents: 300000, fx: null });
+  const eurPay = pay({ bookingId: 'e1', amountCents: 300000, processorFeeCents: null, fx: null, booking: { totalCents: 300000, taxCents: 0, supplierCostCents: null } });
+  const eurRefund = pay({ bookingId: 'e1', createdAt: '2026-09-10T12:00:00Z', kind: 'refund', amountCents: -1000, processorFeeCents: null, fx: null, booking: { totalCents: 300000, taxCents: 0, supplierCostCents: null } });
+  const mx = computeMetrics([...bookings, eur], [...payments, eurPay, eurRefund], [{ status: 'balance_due', balanceCents: 30000, fx: 1 }, { status: 'confirmed', balanceCents: 50000, fx: null }], period, TZ);
+  eq('an unconverted booking adds nothing to the booking figures', [mx.bookingsCount, mx.grossBookingsBaseCents, mx.averageBookingBaseCents, mx.byPackage.length], [m.bookingsCount, m.grossBookingsBaseCents, m.averageBookingBaseCents, m.byPackage.length]);
+  eq('  …and is counted instead', mx.unconvertedBookings, 1);
+  eq('  …its money is left out of received and refunded, and counted', [mx.paymentsReceivedBaseCents, mx.refundsIssuedBaseCents, mx.unconvertedPayments, mx.unconvertedRefunds], [m.paymentsReceivedBaseCents, m.refundsIssuedBaseCents, 1, 1]);
+  eq('  …an open balance with no rate is left out of balances outstanding, and counted', [mx.balancesOutstandingBaseCents, mx.unconvertedOpenBookings], [30000, 1]);
+  const sx = computeStatement([...payments, eurPay, eurRefund]);
+  eq('  …and out of every line of the statement, which says how many', [sx.grossPaidBaseCents, sx.netPlatformProfitBaseCents, sx.unconvertedPayments, sx.unconvertedRefunds], [s.grossPaidBaseCents, s.netPlatformProfitBaseCents, 1, 1]);
+  const cx = reportToCsv(resolvePeriod({}, NOW, TZ), 'CAD', mx, sx);
+  eq('  …and so does the CSV', [cx.includes('Gross bookings,2100.00,3,1 booking with no exchange rate left out'), cx.includes('Gross booking value paid,1800.00,1 payment with no exchange rate left out')], [true, true]);
+}
+
+// ── the CSV is safe to open in a spreadsheet ────────────────────────────────
+{
+  const planted = computeMetrics(
+    [booking({ id: 'z1', packageId: 'pz', packageTitle: '=HYPERLINK("https://phish.example","Click")' }), booking({ id: 'z2', packageId: 'py', packageTitle: '@SUM(1)', destination: '+Island' })],
+    [pay({ kind: 'refund', amountCents: -20000, processorFeeCents: null })],
+    [],
+    period,
+    TZ
+  );
+  const out = reportToCsv(resolvePeriod({}, NOW, TZ), 'CAD', planted, computeStatement([pay({ kind: 'refund', amountCents: -20000, processorFeeCents: null })]));
+  eq('a partner-typed formula in a tour title is neutralised', out.includes(`"'=HYPERLINK(""https://phish.example"",""Click"")",1000.00,1`), true);
+  eq('  …and so are @ and + lead-ins', [out.includes("'@SUM(1),1000.00,1"), out.includes("'+Island,1000.00,1")], [true, true]);
+  eq('  …while a negative amount stays a number', out.includes('Less refunds and chargebacks,-200.00'), true);
+}
+eq('a tab-led cell is neutralised', csvCell('\t=cmd'), "'\t=cmd");
+eq('  …and a carriage-return-led one is quoted as well', csvCell('\r=1+1'), `"'\r=1+1"`);
+eq('  …a phone number with a + keeps its digits behind the quote', csvCell('+1 416 555 0100'), "'+1 416 555 0100");
+eq('  …and plain numbers are left alone', [csvCell('-2700.00'), csvCell(-5), csvCell('42')], ['-2700.00', '-5', '42']);
 
 if (failed) {
   console.log(`\n${failed} FAILED`);

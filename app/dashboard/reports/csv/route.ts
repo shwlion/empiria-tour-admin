@@ -1,6 +1,5 @@
 import { requireCapability } from '@/lib/auth';
-import { getSettings } from '@/lib/admin/settings';
-import { loadReport, reportToCsv, resolvePeriod } from '@/lib/admin/reports';
+import { loadReport, reportToCsv, resolvePeriod, type Report } from '@/lib/admin/reports';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +8,16 @@ export async function GET(request: Request) {
   await requireCapability('viewFinance');
   const sp = new URL(request.url).searchParams;
   const period = resolvePeriod({ period: sp.get('period') ?? undefined, from: sp.get('from') ?? undefined, to: sp.get('to') ?? undefined });
-  const [report, settings] = await Promise.all([loadReport(period), getSettings()]);
+  let report: Report | null;
+  try {
+    report = await loadReport(period);
+  } catch (error) {
+    // No file at all rather than one that silently holds part of the period.
+    console.error('[reports] csv load failed', error);
+    return new Response('The figures could not be read. Try again.', { status: 503 });
+  }
   if (!report) return new Response('Not configured', { status: 503 });
-  const body = '﻿' + reportToCsv(period, settings.defaultCurrency, report.metrics, report.statement);
+  const body = '﻿' + reportToCsv(period, report.currency, report.metrics, report.statement);
   return new Response(body, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',

@@ -4,8 +4,7 @@ import { Download } from 'lucide-react';
 import { Banner, Button, Card, PageHeader, Table } from '@/components/ui';
 import { formatPrice } from '@/lib/money';
 import { requireCapability } from '@/lib/auth';
-import { getSettings } from '@/lib/admin/settings';
-import { PERIODS, loadReport, resolvePeriod, type Metrics } from '@/lib/admin/reports';
+import { PERIODS, loadReport, resolvePeriod, type Metrics, type Report } from '@/lib/admin/reports';
 import { BarChart, ColumnChart } from './Charts';
 
 export const dynamic = 'force-dynamic';
@@ -38,23 +37,39 @@ function bucket(byDay: Metrics['byDay']) {
   return [...weeks.values()];
 }
 
+/** "3 payments", "1 payment". */
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 /**
  * B5 — reporting and finance, for the Admin role only.
  *
- * Every figure is in the default currency and belongs to the selected period:
- * bookings by when they were made, money by when it moved. The revenue-share
- * statement at the foot is §4.6(b) read over the period's payments; its two
- * caveats — payments with no processor fee recorded, and bookings with no
- * supplier cost — are printed next to the lines they affect rather than
- * hidden in a footnote, because a statement is only as good as its inputs.
+ * Every figure is in the reporting currency and belongs to the selected
+ * period: bookings by when they were made, money by when it moved. The
+ * revenue-share statement at the foot is §4.6(b) read over the period's
+ * payments; its caveats — payments with no processor fee recorded, bookings
+ * with no supplier cost, and money in another currency with no exchange rate
+ * on record, which is left out — are printed next to the lines they affect
+ * rather than hidden in a footnote, because a statement is only as good as
+ * its inputs.
  */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireCapability('viewFinance');
   const params = await searchParams;
   const period = resolvePeriod(params);
-  const [report, settings] = await Promise.all([loadReport(period), getSettings()]);
-  const cur = settings.defaultCurrency;
-  const money = (cents: number) => formatPrice(cents, cur);
+  let report: Report | null;
+  try {
+    report = await loadReport(period);
+  } catch (error) {
+    // Better no figures than wrong ones: a read that failed part-way would
+    // otherwise have reported whatever it had as the whole.
+    console.error('[reports] load failed', error);
+    return (
+      <>
+        <PageHeader title="Reports" />
+        <Banner tone="error">The figures could not be read, so none are shown. Reload to try again.</Banner>
+      </>
+    );
+  }
 
   if (!report) {
     return (
@@ -64,27 +79,35 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </>
     );
   }
-  const { metrics: m, statement: s } = report;
+  const { metrics: m, statement: s, currency: cur } = report;
+  const money = (cents: number) => formatPrice(cents, cur);
+  // Money in another currency with no exchange rate on record is left out of
+  // every converted figure; each figure it is missing from says so.
+  const leftOut = (n: number, one: string, many: string) => (n ? `${count(n, one, many)} with no exchange rate left out` : undefined);
+  const join = (...notes: (string | undefined)[]) => notes.filter(Boolean).join(' · ') || undefined;
 
   const tiles: { label: string; value: string; note?: string }[] = [
-    { label: 'Gross bookings', value: money(m.grossBookingsBaseCents), note: `${m.bookingsCount} ${m.bookingsCount === 1 ? 'booking' : 'bookings'}` },
+    { label: 'Gross bookings', value: money(m.grossBookingsBaseCents), note: join(count(m.bookingsCount, 'booking', 'bookings'), m.unconvertedBookings ? `${m.unconvertedBookings} more with no exchange rate left out` : undefined) },
     { label: 'Average booking value', value: money(m.averageBookingBaseCents) },
     { label: 'Supplier cost', value: money(m.supplierCostBaseCents), note: m.uncostedBookings ? `${m.uncostedBookings} without a cost entered` : undefined },
     { label: 'Gross margin', value: money(m.grossMarginBaseCents) },
-    { label: 'Payments received', value: money(m.paymentsReceivedBaseCents) },
-    { label: 'Refunds issued', value: money(m.refundsIssuedBaseCents) },
-    { label: 'Balances outstanding', value: money(m.balancesOutstandingBaseCents), note: 'as of today, all open bookings' },
+    { label: 'Payments received', value: money(m.paymentsReceivedBaseCents), note: leftOut(m.unconvertedPayments, 'payment', 'payments') },
+    { label: 'Refunds issued', value: money(m.refundsIssuedBaseCents), note: leftOut(m.unconvertedRefunds, 'refund', 'refunds') },
+    { label: 'Balances outstanding', value: money(m.balancesOutstandingBaseCents), note: join('as of today, all open bookings', leftOut(m.unconvertedOpenBookings, 'booking', 'bookings')) },
   ];
 
   const statementLines: { label: string; cents: number; sign: '+' | '−' | '='; note?: string; strong?: boolean }[] = [
-    { label: 'Gross booking value paid', cents: s.grossPaidBaseCents, sign: '+' },
-    { label: 'Refunds and chargebacks', cents: s.refundsBaseCents, sign: '−' },
-    { label: 'Processor fees', cents: s.processorFeesBaseCents, sign: '−', note: s.feesUnknown ? `${s.feesUnknown} ${s.feesUnknown === 1 ? 'payment has' : 'payments have'} no fee recorded` : undefined },
+    { label: 'Gross booking value paid', cents: s.grossPaidBaseCents, sign: '+', note: s.unconvertedPayments ? `${count(s.unconvertedPayments, 'payment is', 'payments are')} in another currency with no exchange rate on record, and left out of every line` : undefined },
+    { label: 'Refunds and chargebacks', cents: s.refundsBaseCents, sign: '−', note: s.unconvertedRefunds ? `${count(s.unconvertedRefunds, 'refund is', 'refunds are')} in another currency with no exchange rate on record, and left out of every line` : undefined },
+    { label: 'Processor fees', cents: s.processorFeesBaseCents, sign: '−', note: s.feesUnknown ? `${count(s.feesUnknown, 'payment has', 'payments have')} no fee recorded` : undefined },
     { label: 'Taxes remitted', cents: s.taxesRemittedBaseCents, sign: '−' },
-    { label: 'Supplier cost of services', cents: s.supplierCostBaseCents, sign: '−', note: s.uncostedPayments ? `${s.uncostedPayments} ${s.uncostedPayments === 1 ? 'payment is' : 'payments are'} on bookings with no supplier cost` : undefined },
+    { label: 'Supplier cost of services', cents: s.supplierCostBaseCents, sign: '−', note: s.uncostedPayments ? `${count(s.uncostedPayments, 'payment is', 'payments are')} on bookings with no supplier cost` : undefined },
     { label: 'Net Platform Profit', cents: s.netPlatformProfitBaseCents, sign: '=', strong: true },
     { label: `Revenue share at ${Math.round(s.rate * 100)}%`, cents: s.revenueShareBaseCents, sign: '=', strong: true },
   ];
+  const unvalued = m.unconvertedBookings
+    ? ` ${count(m.unconvertedBookings, 'booking', 'bookings')} in another currency with no exchange rate ${m.unconvertedBookings === 1 ? 'is' : 'are'} left out.`
+    : '';
 
   return (
     <>
@@ -141,16 +164,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Payments received" description={`Money that arrived, by ${m.byDay.length > 62 ? 'week' : 'day'}. Refunds are in the tile above and the CSV.`}>
+        <Card title="Payments received" description={`Money that arrived, by ${m.byDay.length > 62 ? 'week' : 'day'}. Refunds are in the tile above and the CSV.${m.unconvertedPayments ? ` ${count(m.unconvertedPayments, 'payment', 'payments')} with no exchange rate ${m.unconvertedPayments === 1 ? 'is' : 'are'} left out.` : ''}`}>
           <ColumnChart points={bucket(m.byDay)} currency={cur} format={money} />
         </Card>
-        <Card title="Bookings by tour" description="Gross value of bookings made in the period, largest first.">
-          <BarChart rows={m.byPackage.slice(0, 8).map((p) => ({ label: p.title, valueCents: p.grossBaseCents, count: p.count }))} format={money} />
+        <Card title="Bookings by tour" description={`Gross value of bookings made in the period, largest first.${unvalued}`}>
+          <BarChart rows={m.byPackage.slice(0, 8).map((p) => ({ id: p.id, label: p.title, valueCents: p.grossBaseCents, count: p.count }))} format={money} />
         </Card>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <Card title="By tour">
+        <Card title="By tour" description={unvalued.trim() || undefined}>
           {m.byPackage.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">No bookings in this period.</p>
           ) : (
@@ -165,7 +188,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </Table>
           )}
         </Card>
-        <Card title="By destination">
+        <Card title="By destination" description={unvalued.trim() || undefined}>
           {m.byDestination.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">No bookings in this period.</p>
           ) : (

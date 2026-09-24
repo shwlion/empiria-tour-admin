@@ -9,7 +9,9 @@ import { explain, fail, ok, text, type ActionResult } from '@/lib/actions';
 import { approvalPlan, getApplication } from '@/lib/admin/partners';
 
 // Where an approved partner signs in. The same PARTNER_URL the invitation's
-// redirect uses; the default is the production console.
+// redirect uses. The default is the one the storefront's NEXT_PUBLIC_PARTNER_URL
+// falls back to; set it (see .env.local.example) wherever the console is served
+// from, since unset it decides where every approval email sends the partner.
 const PARTNER_URL = (process.env.PARTNER_URL || 'https://partners.empiria.events').replace(/\/$/, '');
 
 /**

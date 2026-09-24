@@ -418,6 +418,8 @@ export type BookingEmailFacts = {
   startTime: string | null;
   /** The most recent money in, for a resent "we've received …". Null when none has arrived. */
   lastPaymentCents: number | null;
+  /** The booking's own key (storefront migration 0023), for links a guest can open. */
+  accessToken: string;
 };
 
 export async function loadBookingEmailFacts(bookingId: string): Promise<BookingEmailFacts | null> {
@@ -428,7 +430,7 @@ export async function loadBookingEmailFacts(bookingId: string): Promise<BookingE
       .from('bookings')
       .select(
         'id, reference, status, lead_name, lead_email, user_id, departure_id, currency, total_cents, ' +
-          'balance_cents, balance_due_on, adults, children, infants, ' +
+          'balance_cents, balance_due_on, adults, children, infants, access_token, ' +
           'packages!inner ( title, meeting_point, what_to_bring ), departures!inner ( starts_on, start_time )'
       )
       .eq('id', bookingId)
@@ -449,6 +451,7 @@ export async function loadBookingEmailFacts(bookingId: string): Promise<BookingE
     id: string; reference: string; status: string; lead_name: string; lead_email: string;
     user_id: string | null; departure_id: string; currency: string; total_cents: number;
     balance_cents: number | null; balance_due_on: string | null; adults: number; children: number; infants: number;
+    access_token: string;
     packages: { title: string; meeting_point: string | null; what_to_bring: string | null };
     departures: { starts_on: string; start_time: string | null };
   };
@@ -473,6 +476,7 @@ export async function loadBookingEmailFacts(bookingId: string): Promise<BookingE
     startsOn: b.departures.starts_on,
     startTime: b.departures.start_time,
     lastPaymentCents: last?.amount_cents ?? null,
+    accessToken: b.access_token,
   };
 }
 
@@ -510,12 +514,16 @@ export function bookingEmailData(
     case 'balance_paid':
       return { ...trip, 'payment.amount': paymentCents, 'booking.total': f.totalCents };
     case 'balance_due':
-      // The booking's own page on the storefront, where the balance is paid.
+      // The booking's own page on the storefront, where the balance is paid —
+      // through its `open` link, which carries the booking's key, so a guest
+      // can follow it from any device. The storefront swaps the key for a
+      // cookie before the page loads (its lib/bookingAccess.ts), so it never
+      // stays in the address bar.
       return {
         ...trip,
         'booking.balance': f.balanceCents,
         'booking.balance_due_on': f.balanceDueOn,
-        'payment.link': `${STOREFRONT_URL}/booking/${encodeURIComponent(f.reference)}`,
+        'payment.link': `${STOREFRONT_URL}/booking/${encodeURIComponent(f.reference.toUpperCase())}/open?key=${encodeURIComponent(f.accessToken)}`,
       };
     case 'pre_departure':
       return { ...trip, 'departure.start_time': f.startTime, 'departure.meeting_point': f.meetingPoint, 'package.what_to_bring': f.whatToBring };

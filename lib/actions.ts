@@ -30,8 +30,17 @@ export function fail(message: string, fields?: FieldErrors): ActionResult<never>
  * where it is useful.
  */
 export function explain(error: unknown, fallback = 'That did not save. Please try again.'): string {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  console.error('[action]', message);
+  // supabase-js hands its errors back as plain objects — message, code,
+  // details, hint — not as Error instances, and the actions throw them as they
+  // come. Reading only an Error's message logged "[object Object]" for every
+  // database refusal and matched none of the translations below. The whole
+  // object is logged: its details say which row and which key.
+  const dbError =
+    !(error instanceof Error) && typeof (error as { message?: unknown } | null)?.message === 'string'
+      ? (error as { message: string })
+      : null;
+  const message = error instanceof Error ? error.message : dbError ? dbError.message : String(error ?? '');
+  console.error('[action]', dbError ?? message);
 
   if (!message) return fallback;
   if (message.includes('SUPABASE_KEY')) return message;

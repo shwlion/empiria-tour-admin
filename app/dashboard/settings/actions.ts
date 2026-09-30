@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/auth';
 import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
-import { cents, explain, fail, integer, nullable, ok, text, type ActionResult } from '@/lib/actions';
+import { cents, explain, fail, integer, nullable, ok, paragraphs, text, type ActionResult } from '@/lib/actions';
 import type { TaxRuleRow } from '@/lib/admin/settings';
 
 /**
@@ -97,6 +97,9 @@ export async function saveSettingsAction(
     receipt_title: nullable(form.get('receipt_title')),
     receipt_intro: nullable(form.get('receipt_intro')),
     receipt_footer: nullable(form.get('receipt_footer')),
+    // 0036: composed into every piece of entry advice, the tick and the receipt.
+    entry_requirements_disclaimer: paragraphs(form.get('entry_requirements_disclaimer')),
+    entry_requirements_other_passport: paragraphs(form.get('entry_requirements_other_passport')),
     updated_at: new Date().toISOString(),
     updated_by: user.id,
   };
@@ -129,6 +132,9 @@ export async function saveSettingsAction(
     // The storefront's footer and policy pages read this row and revalidate on
     // their own five-minute clock; nothing here can push into that deployment.
     revalidatePath('/dashboard/settings');
+    // The entry-requirement previews and the overview's gaps read the two texts.
+    revalidatePath('/dashboard/content/entry-requirements');
+    revalidatePath('/dashboard');
     return ok(undefined, 'Settings saved. The public site picks these up within five minutes.');
   } catch (e) {
     return fail(explain(e));

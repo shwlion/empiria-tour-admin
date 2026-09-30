@@ -179,6 +179,40 @@ export default function SettingsForm({ settings, currencies, gaps, canEdit }: Pr
       </Card>
 
       <Card
+        title="Entry requirements"
+        description="Shown with every piece of entry advice, on the tour page, at the booking tick, on the booking page and receipt, and in the entry-requirement emails. Both are Empiria’s words, for Empiria to confirm; the advice itself is written per country under Content → Entry requirements."
+      >
+        <div className="grid gap-4">
+          <Field
+            label="Disclaimer"
+            htmlFor="entry_requirements_disclaimer"
+            hint="Empiria’s words, shown as written after the advice, with the row’s official government page beneath it. Seeded with the line you asked for; blank removes it, and the overview lists that."
+          >
+            <Textarea
+              id="entry_requirements_disclaimer"
+              name="entry_requirements_disclaimer"
+              rows={2}
+              defaultValue={settings.entryRequirementsDisclaimer ?? ''}
+              disabled={!canEdit}
+            />
+          </Field>
+          <Field
+            label="Travelling on another passport"
+            htmlFor="entry_requirements_other_passport"
+            hint="Empiria’s words, shown as written with every piece of advice, and on their own when no row covers a traveller’s passport: what anyone in the party on a different passport should do — contact you. Blank shows the contact line only, and the overview lists that."
+          >
+            <Textarea
+              id="entry_requirements_other_passport"
+              name="entry_requirements_other_passport"
+              rows={3}
+              defaultValue={settings.entryRequirementsOtherPassport ?? ''}
+              disabled={!canEdit}
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <Card
         title="Currency and timing"
         description="The hold window is how long a traveller's seats survive while they fill in the booking form. The payment window is how long they survive after the booking exists."
       >

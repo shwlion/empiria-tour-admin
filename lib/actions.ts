@@ -86,6 +86,16 @@ export function text(value: FormDataEntryValue | null): string {
 }
 
 /**
+ * A textarea's text, as `nullable` reads it, with the CRLF a browser submits
+ * made LF. For wording the storefront composes into other text, where a stray
+ * carriage return would travel into every email and snapshot.
+ */
+export function paragraphs(value: FormDataEntryValue | null): string | null {
+  const s = text(value).replace(/\r\n?/g, '\n');
+  return s === '' ? null : s;
+}
+
+/**
  * A whole number, or `fallback` when the field is blank, absent or not a number.
  *
  * Blank is checked before parsing because Number('') is 0, which is finite:

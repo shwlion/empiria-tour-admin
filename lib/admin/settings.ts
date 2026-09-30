@@ -36,6 +36,13 @@ export type PlatformSettings = {
   receiptTitle: string | null;
   receiptIntro: string | null;
   receiptFooter: string | null;
+  /**
+   * 0036: Empiria's words beside every piece of entry advice — the "check the
+   * official government website" line (seeded with the user's wording) and
+   * what a traveller on a passport with no row should do.
+   */
+  entryRequirementsDisclaimer: string | null;
+  entryRequirementsOtherPassport: string | null;
   updatedAt: string | null;
 };
 
@@ -56,6 +63,8 @@ const EMPTY: PlatformSettings = {
   receiptTitle: null,
   receiptIntro: null,
   receiptFooter: null,
+  entryRequirementsDisclaimer: null,
+  entryRequirementsOtherPassport: null,
   updatedAt: null,
 };
 
@@ -135,6 +144,8 @@ export async function getSettings(): Promise<PlatformSettings> {
     receiptTitle: data.receipt_title,
     receiptIntro: data.receipt_intro,
     receiptFooter: data.receipt_footer,
+    entryRequirementsDisclaimer: data.entry_requirements_disclaimer,
+    entryRequirementsOtherPassport: data.entry_requirements_other_passport,
     updatedAt: data.updated_at,
   };
 }

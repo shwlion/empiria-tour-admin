@@ -1,6 +1,8 @@
 import { explain } from '@/lib/actions';
 import {
   contentChanged,
+  countryForPath,
+  entryGaps,
   isHttpsAddress,
   failedNoticeKeys,
   noticeDecision,
@@ -11,13 +13,16 @@ import {
   parseApplyDaysBefore,
   validateEntryRequirement,
   type BookedTraveller,
+  type EntryGapInput,
   type EntryRequirementDraft,
+  type EntryRequirementRecord,
 } from './entryRequirements';
 
 /**
  * Entry requirements (0036): what counts as a change to the advice, what a
  * save accepts, when it must ask about the travellers already booked (s.37),
- * and what the Booked travellers card says about each notice.
+ * what the Booked travellers card says about each notice, and what the
+ * overview lists as still owed.
  *
  *   bun run lib/admin/entryRequirements.test.ts
  */
@@ -159,6 +164,81 @@ eq('the outbox says sent: sent', noticeStatus(dueRow, 'sent'), 'sent');
 eq('the outbox says failed: failed', noticeStatus(dueRow, 'failed'), 'failed');
 eq('a cancelled message still means not told: failed', noticeStatus(dueRow, 'cancelled'), 'failed');
 eq('the message outranks the due flag', noticeStatus(booked({ noticeDue: false, noticeKey: 'k' }), 'sent'), 'sent');
+
+// ── a tour's country, as package_country() finds it ─────────────────────────
+const coded = [
+  { path: 'greece', code: 'GR' },
+  { path: 'europe/italy', code: 'IT' },
+  { path: 'hx036-r', code: 'GR' },
+];
+eq('a place inside a coded country takes its code', countryForPath('greece/cyclades/santorini', coded), 'GR');
+eq('the coded place itself', countryForPath('greece', coded), 'GR');
+eq('the nearest code wins under an uncoded continent', countryForPath('europe/italy/sicily', coded), 'IT');
+eq('an uncoded continent has no country', countryForPath('europe', coded), null);
+eq('a sibling whose address starts the same inherits nothing', countryForPath('hx036-r2/beach', coded), null);
+eq('a tour with no destination has no country', countryForPath(null, coded), null);
+
+// ── what the overview lists as owed ─────────────────────────────────────────
+const rec = (o: Partial<EntryRequirementRecord> = {}): EntryRequirementRecord => ({
+  id: 'r-gr-ca', destinationCountry: 'GR', passportCountry: 'CA', requirement: 'none', headline: 'No visa for up to 90 days.',
+  beforeArrival: 'Passport valid for three months.', why: null, processingTime: null, applyDaysBefore: null,
+  applyUrl: null, officialUrl: null, status: 'active', checkedOn: '2026-09-17',
+  contentVersion: 1, contentChangedAt: null, noticeRevision: 0, noticeRevisedAt: null, updatedAt: '2026-09-17T12:00:00Z', ...o,
+});
+const tour = (o: Partial<EntryGapInput['tours'][number]> = {}) => ({
+  id: 't1', title: 'Aegean Odyssey', status: 'published', country: 'GR' as string | null, hasUpcomingBookings: false, ...o,
+});
+const base: EntryGapInput = {
+  tours: [tour()], rows: [rec()], owed: [],
+  disclaimer: 'Always check the official government website for the specifics of your trip before you travel.',
+  otherPassport: 'Travelling on another passport? Contact us before you book.', contactPhone: '+1 416 555 0100', today: '2026-09-27',
+};
+const gaps = (o: Partial<EntryGapInput>) => entryGaps({ ...base, ...o });
+const hrefs = (o: Partial<EntryGapInput>) => gaps(o).map((g) => g.href);
+
+eq('everything written, checked and sent: nothing owed', entryGaps(base), []);
+
+eq('a published tour with no country is listed, by name', gaps({ tours: [tour({ country: null })] }).map((g) => [g.href, g.detail.includes('“Aegean Odyssey”')]), [['/dashboard/content/destinations', true]]);
+eq('a draft tour with no country and nobody booked is not', gaps({ tours: [tour({ country: null, status: 'draft' })] }), []);
+eq('a draft tour with no country but travellers booked is', hrefs({ tours: [tour({ country: null, status: 'draft', hasUpcomingBookings: true })] }), ['/dashboard/content/destinations']);
+eq('an archived tour with nobody booked is not', gaps({ tours: [tour({ country: null, status: 'archived' })] }), []);
+const four = gaps({ tours: ['A', 'B', 'C', 'D'].map((t) => tour({ id: t, title: t, country: null })) })[0].detail;
+eq('four tours with no country: counted, and three named', [four.startsWith('4 tours have no country'), four.endsWith('“A”, “B”, “C” and 1 more.')], [true, true]);
+
+eq('a country on sale with no Canadian-passport row: the gap names TICO and offers a new row', gaps({ tours: [tour({ country: 'IT' })], rows: [] }).map((g) => [g.detail, g.href]), [
+  ['Italy: tours are on sale or booked with no active advice for Canadian passports — TICO’s online minimum.', '/dashboard/content/entry-requirements/new?destination=IT&passport=CA'],
+]);
+eq('a draft Canadian-passport row still leaves the gap, pointing at the draft', hrefs({ rows: [rec({ status: 'draft' })] }), ['/dashboard/content/entry-requirements/r-gr-ca']);
+eq('a row for another passport does not cover Canadians', hrefs({ rows: [rec({ id: 'r-gr-de', passportCountry: 'DE' })] }), ['/dashboard/content/entry-requirements/new?destination=GR&passport=CA']);
+eq('a tour in Canada needs no Canadian-passport row', gaps({ tours: [tour({ country: 'CA' })], rows: [] }), []);
+eq('a country with only a draft tour and nobody booked is not owed a row', gaps({ tours: [tour({ status: 'draft' })], rows: [] }), []);
+
+eq('checked 179 days ago: fine', gaps({ rows: [rec({ checkedOn: '2026-04-01' })] }), []);
+eq('checked 180 days ago: still fine', gaps({ rows: [rec({ checkedOn: '2026-03-31' })] }), []);
+eq('checked 181 days ago: listed, with the age', gaps({ rows: [rec({ checkedOn: '2026-03-30' })] }).map((g) => g.detail), ['Greece · Canada passport was last checked against official sources 181 days ago.']);
+eq('an active row never checked is listed', gaps({ rows: [rec({ checkedOn: null })] }).map((g) => g.href), ['/dashboard/content/entry-requirements/r-gr-ca']);
+eq('a draft row is never stale', gaps({ rows: [rec(), rec({ id: 'r2', passportCountry: 'DE', status: 'draft', checkedOn: null })] }), []);
+eq('v2: an active row with no headline is listed, pointing at the row', gaps({ rows: [rec({ headline: null })] }).map((g) => [g.detail, g.href]), [
+  ['Greece · Canada passport has no headline, so its alert leads with the requirement caption — the one line of what to do is Empiria’s to write.', '/dashboard/content/entry-requirements/r-gr-ca'],
+]);
+eq('v2: a draft row with no headline is not', gaps({ rows: [rec(), rec({ id: 'r2', passportCountry: 'DE', status: 'draft', headline: null })] }), []);
+eq('v2: a row never checked and with no headline is listed twice, the check first', gaps({ rows: [rec({ checkedOn: null, headline: null })] }).map((g) => g.detail), [
+  'Greece · Canada passport is active and has never been marked as checked against official sources.',
+  'Greece · Canada passport has no headline, so its alert leads with the requirement caption — the one line of what to do is Empiria’s to write.',
+]);
+
+eq('an empty disclaimer is listed', hrefs({ disclaimer: '  ' }), ['/dashboard/settings']);
+eq('empty other-passport text is listed', hrefs({ otherPassport: null }), ['/dashboard/settings']);
+eq('no contact phone is listed', gaps({ contactPhone: null }).map((g) => g.detail.startsWith('No contact phone. s.38')), [true]);
+
+eq('owed and failed notices are each listed', gaps({
+  owed: [{ requirementId: 'r-gr-ca', label: 'Greece · Canada passport', due: 2, failed: 1 }],
+}).map((g) => g.detail), [
+  'Greece · Canada passport: 2 booked travellers are owed the changed wording, and nothing is queued yet.',
+  'Greece · Canada passport: 1 notice failed to send.',
+]);
+eq('a queued notice is on its way, so nothing is listed for it', gaps({ owed: [] }), []);
+eq('every entry gap is filed under one area', gaps({ disclaimer: null, contactPhone: null }).every((g) => g.area === 'Entry requirements'), true);
 
 // ── an answer counts only to a question that was asked ──────────────────────
 eq('an unasked tell is ignored', noticeDecision({ asked: false, notice: 'tell' }), null);

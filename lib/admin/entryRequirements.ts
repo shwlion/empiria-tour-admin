@@ -1,6 +1,8 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { countryName, isCountryCode } from '@/lib/countries';
 import type { EntrySettings, RequirementKind } from '@/lib/entryAdvice';
+import type { ContentGap } from '@/lib/admin/content';
+import { dateIn, REPORT_TIMEZONE } from '@/lib/admin/reports';
 
 /**
  * Entry requirements by passport (0036): Empiria's advice for each
@@ -431,6 +433,178 @@ export async function listOwedNotices(rows: EntryRequirementRecord[]): Promise<{
     }
   }
   return { owed, error: null };
+}
+
+// ─── What is still owed ───────────────────────────────────────────────────
+
+/**
+ * A tour's country, as 0036's `package_country()` finds it: the code on the
+ * nearest place at or above the tour's destination. "Above" is a whole path
+ * segment — `hx036-r2` is not inside `hx036-r`. Pure, and asserted in
+ * `entryRequirements.test.ts`.
+ */
+export function countryForPath(path: string | null, coded: { path: string; code: string }[]): string | null {
+  if (!path) return null;
+  let best: { path: string; code: string } | null = null;
+  for (const c of coded) {
+    if (c.path !== path && !path.startsWith(`${c.path}/`)) continue;
+    if (!best || c.path.length > best.path.length) best = c;
+  }
+  return best?.code ?? null;
+}
+
+export type EntryGapInput = {
+  tours: { id: string; title: string; status: string; country: string | null; hasUpcomingBookings: boolean }[];
+  rows: EntryRequirementRecord[];
+  owed: OwedNotices[];
+  disclaimer: string | null;
+  otherPassport: string | null;
+  contactPhone: string | null;
+  /** YYYY-MM-DD in the seller's calendar, as `checked_on` is stamped. */
+  today: string;
+};
+
+const AREA = 'Entry requirements';
+const LIST = '/dashboard/content/entry-requirements';
+const SETTINGS = '/dashboard/settings';
+/** How long a check stands before the overview asks for another (spec §11: 180 days). */
+export const RECHECK_DAYS = 180;
+
+const days = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
+/** “A”, “B”, “C” and 2 more. */
+const titles = (list: string[]) =>
+  list.slice(0, 3).map((t) => `“${t}”`).join(', ') + (list.length > 3 ? ` and ${list.length - 3} more` : '');
+
+/**
+ * Spec §7 "Owed content", for the overview. A tour counts when it is
+ * published, or when travellers are booked on an upcoming departure of it —
+ * taking a tour off sale does not take its travellers off the road. Pure, and
+ * asserted in `entryRequirements.test.ts`.
+ */
+export function entryGaps(input: EntryGapInput): ContentGap[] {
+  const gaps: ContentGap[] = [];
+  const live = input.tours.filter((t) => t.status === 'published' || t.hasUpcomingBookings);
+
+  const noCountry = live.filter((t) => !t.country);
+  if (noCountry.length > 0) {
+    gaps.push({
+      area: AREA,
+      detail: `${noCountry.length} ${noCountry.length === 1 ? 'tour has' : 'tours have'} no country — no place at or above ${noCountry.length === 1 ? 'its destination has' : 'their destinations have'} a code, so travellers see “not yet published”: ${titles(noCountry.map((t) => t.title))}.`,
+      href: '/dashboard/content/destinations',
+    });
+  }
+
+  // TICO's online minimum: the advice for a Canadian citizen on a Canadian
+  // passport. A tour in Canada needs none for Canadians.
+  const abroad = [...new Set(live.map((t) => t.country).filter((c): c is string => c !== null && c !== 'CA'))].sort(
+    (a, b) => (countryName(a) ?? a).localeCompare(countryName(b) ?? b)
+  );
+  for (const code of abroad) {
+    const row = input.rows.find((r) => r.destinationCountry === code && r.passportCountry === 'CA');
+    if (row?.status === 'active') continue;
+    gaps.push({
+      area: AREA,
+      detail: `${countryName(code) ?? code}: tours are on sale or booked with no active advice for Canadian passports — TICO’s online minimum.`,
+      href: row ? `${LIST}/${row.id}` : `${LIST}/new?destination=${code}&passport=CA`,
+    });
+  }
+
+  for (const r of input.rows) {
+    if (r.status !== 'active') continue;
+    const label = pairLabel(r.destinationCountry, r.passportCountry);
+    if (!r.checkedOn) {
+      gaps.push({ area: AREA, detail: `${label} is active and has never been marked as checked against official sources.`, href: `${LIST}/${r.id}` });
+    } else if (days(r.checkedOn, input.today) > RECHECK_DAYS) {
+      gaps.push({ area: AREA, detail: `${label} was last checked against official sources ${days(r.checkedOn, input.today)} days ago.`, href: `${LIST}/${r.id}` });
+    }
+    // v2. Null is "not written yet" (the database refuses a blank one). The
+    // alert still works, led by the requirement caption, but the one line of
+    // what to do is Empiria's to write.
+    if (!r.headline) {
+      gaps.push({ area: AREA, detail: `${label} has no headline, so its alert leads with the requirement caption — the one line of what to do is Empiria’s to write.`, href: `${LIST}/${r.id}` });
+    }
+  }
+
+  if (!input.disclaimer?.trim()) {
+    gaps.push({ area: AREA, detail: 'The disclaimer is empty, so nothing beside the advice tells travellers to check the official government website.', href: SETTINGS });
+  }
+  if (!input.otherPassport?.trim()) {
+    gaps.push({ area: AREA, detail: 'The text for travellers on other passports is empty, so they see only the contact line.', href: SETTINGS });
+  }
+
+  // Owed is due (no message queued yet) plus failed. A queued notice is on its way.
+  for (const o of input.owed) {
+    const href = `${LIST}/${o.requirementId}`;
+    if (o.due > 0) {
+      gaps.push({ area: AREA, detail: `${o.label}: ${o.due} booked ${o.due === 1 ? 'traveller is' : 'travellers are'} owed the changed wording, and nothing is queued yet.`, href });
+    }
+    if (o.failed > 0) {
+      gaps.push({ area: AREA, detail: `${o.label}: ${o.failed} ${o.failed === 1 ? 'notice' : 'notices'} failed to send.`, href });
+    }
+  }
+
+  if (!input.contactPhone?.trim()) {
+    gaps.push({ area: AREA, detail: 'No contact phone. s.38 wants the seller’s phone on the receipt, and the contact line beside the advice shows email only.', href: SETTINGS });
+  }
+  return gaps;
+}
+
+/**
+ * Everything `entryGaps` needs, read in one go. Null when the console has no
+ * database key. Throws on a read error, so the overview can say it could not
+ * check rather than report gaps that are not there.
+ */
+export async function readEntryGapInput(): Promise<EntryGapInput | null> {
+  const db = getSupabaseAdmin();
+  if (!db) return null;
+  const [packages, destinations, booked, settings, rows] = await Promise.all([
+    db.from('packages').select('id, title, status, destination_id').limit(5000),
+    db.from('destinations').select('id, path, country_code').limit(2000),
+    db
+      .from('bookings')
+      .select('package_id, departures!inner ( starts_on, status )')
+      .in('status', [...COMMITTED_STATUSES])
+      .gte('departures.starts_on', utcToday())
+      .neq('departures.status', 'cancelled')
+      .limit(10000),
+    db
+      .from('platform_settings')
+      .select('entry_requirements_disclaimer, entry_requirements_other_passport, contact_phone')
+      .maybeSingle(),
+    listEntryRequirements(),
+  ]);
+  if (packages.error) throw packages.error;
+  if (destinations.error) throw destinations.error;
+  if (booked.error) throw booked.error;
+  if (settings.error) throw settings.error;
+
+  const owed = await listOwedNotices(rows);
+  if (owed.error) throw new Error(owed.error);
+
+  const pathOf = new Map((destinations.data ?? []).map((d) => [d.id, d.path]));
+  const coded = (destinations.data ?? [])
+    .filter((d): d is typeof d & { country_code: string } => d.country_code !== null)
+    .map((d) => ({ path: d.path, code: d.country_code }));
+  const withTravellers = new Set((booked.data ?? []).map((b) => b.package_id));
+
+  return {
+    tours: (packages.data ?? []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      status: p.status,
+      country: countryForPath(p.destination_id ? pathOf.get(p.destination_id) ?? null : null, coded),
+      hasUpcomingBookings: withTravellers.has(p.id),
+    })),
+    rows,
+    owed: owed.owed,
+    disclaimer: settings.data?.entry_requirements_disclaimer ?? null,
+    otherPassport: settings.data?.entry_requirements_other_passport ?? null,
+    contactPhone: settings.data?.contact_phone ?? null,
+    // todayInSellerCalendar(), without importing placements.ts, which imports content.ts.
+    today: dateIn(new Date(), REPORT_TIMEZONE),
+  };
 }
 
 /**

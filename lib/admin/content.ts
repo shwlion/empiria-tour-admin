@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { entryGaps, readEntryGapInput } from '@/lib/admin/entryRequirements';
 
 /**
  * Content — the rest of Exhibit A B6.
@@ -205,6 +206,8 @@ export const TEMPLATE_TRIGGERS: Record<string, string> = {
   partner_application_approved: 'Empiria approves the application; the console is theirs.',
   partner_application_declined: 'Empiria declines the application, with a note.',
   partner_application_alert: 'A tour operator applies — sent to Empiria, not the applicant.',
+  entry_requirements_reminder: "Weeks before departure on tours abroad (60 days by default, or two weeks before the traveller's apply-by date when that is earlier), with the entry requirements for the traveller's passport as they now stand.",
+  entry_requirements_changed: 'After staff choose “Tell them” for changed entry requirements, to upcoming bookings advised under the older wording.',
 };
 
 export type EmailTemplate = {
@@ -389,6 +392,20 @@ export async function contentGaps(): Promise<ContentGap[]> {
           ? 'No postcards are published — the landing page hero has nothing to show.'
           : `${published} ${published === 1 ? 'postcard is' : 'postcards are'} published; the landing page shows ${SHOWCASE_SLOTS}.`,
       href: '/dashboard/content/showcase',
+    });
+  }
+
+  // 0036: entry requirements. A failed read says so rather than going quiet —
+  // an owed s.37 notice must not vanish from the overview because a query did.
+  try {
+    const input = await readEntryGapInput();
+    if (input) gaps.push(...entryGaps(input));
+  } catch (error) {
+    console.error('[content] entry requirement gaps', error);
+    gaps.push({
+      area: 'Entry requirements',
+      detail: 'Could not be checked just now — owed notices and missing advice may be hidden. Reload to try again.',
+      href: '/dashboard/content/entry-requirements',
     });
   }
 

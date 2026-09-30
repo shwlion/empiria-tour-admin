@@ -18,7 +18,7 @@ export default async function DestinationsPage() {
         <p className="text-[13px] text-muted-foreground">
           {destinations.length === 0
             ? 'No destinations yet. The storefront menu is built from the published ones.'
-            : `${destinations.length} places · ${live} published. The menu, the filters and every tour's "where" come from this list.`}
+            : `${destinations.length} places · ${live} published. The menu, the filters and every tour's "where" come from this list, and each tour's entry requirements from the nearest country code at or above its place.`}
         </p>
         <Link href="/dashboard/content/destinations/new">
           <Button>
@@ -31,7 +31,7 @@ export default async function DestinationsPage() {
       {destinations.length === 0 ? (
         <EmptyState title="No destinations" description="Create a country first, then the regions and places inside it." />
       ) : (
-        <Table head={['Destination', 'Web address', 'Status', 'Tours', 'Order', '']}>
+        <Table head={['Destination', 'Country', 'Web address', 'Status', 'Tours', 'Order', '']}>
           {destinations.map((d) => (
             <tr key={d.id} className="transition-colors hover:bg-secondary/50">
               <td className="px-4 py-3">
@@ -43,6 +43,18 @@ export default async function DestinationsPage() {
                   {d.depth > 0 && <span className="mr-1.5 text-muted-foreground">└</span>}
                   {d.name}
                 </Link>
+              </td>
+              <td className="px-4 py-3 text-[12px]">
+                {/* 0036: a tour's country is the nearest code at or above its place. */}
+                {d.countryCode ? (
+                  <span className="font-mono font-semibold text-foreground">{d.countryCode}</span>
+                ) : d.coveredBy ? (
+                  <span className="text-muted-foreground">
+                    <span className="font-mono">{d.coveredBy.code}</span> from {d.coveredBy.name}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </td>
               <td className="px-4 py-3 font-mono text-[12px] text-muted-foreground">{d.path}</td>
               <td className="px-4 py-3"><Badge value={d.status} /></td>

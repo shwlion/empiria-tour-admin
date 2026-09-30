@@ -4,6 +4,7 @@ import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Banner, Card, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
+import { COUNTRIES } from '@/lib/countries';
 import { DESTINATION_STATUSES, type DestinationRow } from '@/lib/admin/destinations';
 import { saveDestinationAction } from './actions';
 
@@ -47,6 +48,25 @@ export default function DestinationForm({
               {parents.map((d) => (
                 <option key={d.id} value={d.id}>
                   {'  '.repeat(d.depth)}{d.name}{d.status !== 'published' ? ` (${d.status})` : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Country"
+            htmlFor="country_code"
+            hint={
+              destination?.coveredBy && !destination.countryCode
+                ? `None here, so tours in this place use ${destination.coveredBy.name}'s code, ${destination.coveredBy.code}, for their entry requirements.`
+                : 'Set it on the country itself; every place inside inherits it. A tour uses the nearest code at or above its place for its entry requirements.'
+            }
+            error={err('country_code')}
+          >
+            <Select id="country_code" name="country_code" defaultValue={destination?.countryCode ?? ''} error={Boolean(err('country_code'))}>
+              <option value="">— none —</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.code})
                 </option>
               ))}
             </Select>

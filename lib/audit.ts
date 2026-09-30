@@ -21,7 +21,11 @@ export type AuditAction =
   // Part C. Queuing a message by hand is a staff action against a customer,
   // and "who resent the confirmation, and when" is exactly the kind of question
   // the trail exists to answer.
-  | 'resend_email';
+  | 'resend_email'
+  // s.37 (0036): a decision about the travellers already booked when entry
+  // advice changes — "tell them", "a correction", a send or a retry. The
+  // 25 Sep spec plans the same name.
+  | 'notify';
 
 export type AuditEntry = {
   entity: string;

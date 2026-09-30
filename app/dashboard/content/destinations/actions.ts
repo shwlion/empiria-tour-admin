@@ -6,7 +6,7 @@ import { requireWritableDb } from '@/lib/supabase';
 import { recordAudit, diff } from '@/lib/audit';
 import { explain, fail, ok, text, nullable, integer, type ActionResult, type FieldErrors } from '@/lib/actions';
 import { slugify } from '@/lib/admin/packages';
-import { DESTINATION_STATUSES } from '@/lib/admin/destinations';
+import { DESTINATION_STATUSES, countryChoice } from '@/lib/admin/destinations';
 
 /**
  * B6 — destinations.
@@ -56,13 +56,17 @@ export async function saveDestinationAction(
     const status = text(form.get('status'));
     const heroRaw = text(form.get('hero_image'));
     const heroImage = imageAddress(heroRaw);
+    // 0036: optional, and on the ISO list when set. Audited like the rest,
+    // because it decides which entry requirements every tour below it shows.
+    const country = countryChoice(text(form.get('country_code')), true);
 
     const fields: FieldErrors = {};
     if (!name) fields.name = 'Required';
     if (!slug) fields.slug = 'Required';
     if (!(DESTINATION_STATUSES as readonly string[]).includes(status)) fields.status = 'Choose one';
     if (heroRaw && !heroImage) fields.hero_image = 'An https address, or a path on the storefront';
-    if (Object.keys(fields).length) return fail('A few things need fixing.', fields);
+    if (!country.ok) fields.country_code = 'Choose a country from the list, or none';
+    if (Object.keys(fields).length || !country.ok) return fail('A few things need fixing.', fields);
 
     const columns = {
       name,
@@ -72,6 +76,7 @@ export async function saveDestinationAction(
       meta_description: nullable(form.get('meta_description')),
       status,
       sort_order: integer(form.get('sort_order'), 0),
+      country_code: country.code,
     };
 
     if (!id) {
@@ -94,7 +99,7 @@ export async function saveDestinationAction(
 
     const { data: before } = await db
       .from('destinations')
-      .select('id, parent_id, slug, name, path, description, hero_image, meta_title, meta_description, status, sort_order')
+      .select('id, parent_id, slug, name, path, description, hero_image, meta_title, meta_description, status, sort_order, country_code')
       .eq('id', id)
       .maybeSingle();
     if (!before) return fail('That destination no longer exists.');

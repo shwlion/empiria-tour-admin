@@ -17,7 +17,7 @@ export default async function ContentLayout({ children }: { children: React.Reac
     <>
       <PageHeader
         title="Content"
-        description="The destination tree and the collections the catalogue is arranged by, the policy pages, the disclosure wording Part D turns on, the transactional emails, the landing page's postcards and the journal. All of it renders on the public site."
+        description="The destination tree and the collections the catalogue is arranged by, the policy pages, the disclosure wording Part D turns on, the entry requirements for each passport, the transactional emails, the landing page's postcards and the journal. All of it renders on the public site."
       />
       <ContentTabs />
       {children}

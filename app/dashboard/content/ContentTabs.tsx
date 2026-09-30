@@ -8,6 +8,9 @@ const TABS = [
   { name: 'Collections', href: '/dashboard/content/collections' },
   { name: 'Pages', href: '/dashboard/content/pages' },
   { name: 'Disclosures', href: '/dashboard/content/disclosures' },
+  // Beside Disclosures: both are regulatory wording (TICO ss. 36–38), both
+  // Empiria's words, both recorded against the booking that saw them.
+  { name: 'Entry requirements', href: '/dashboard/content/entry-requirements' },
   { name: 'Emails', href: '/dashboard/content/emails' },
   { name: 'Showcase', href: '/dashboard/content/showcase' },
   // Next to Showcase because it decides what those same four postcards say:

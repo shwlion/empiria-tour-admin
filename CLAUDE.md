@@ -189,7 +189,8 @@ Under Content → Entry requirements. There is one row per destination country
   Blank saves null; so does a headline of only whitespace or invisible
   characters. Line and paragraph separators (U+2028, U+2029) and U+0085 are
   refused. The requirement select's hint says which colour the alert takes
-  (amber strong text is `#b54708`), and the preview draws the row as the
+  (the amber alert's strong fill is `#b54708`, chosen for contrast with its
+  white text; its text is `#a15c07`), and the preview draws the row as the
   tour page's alert, with no date.
 - An active row with no headline is an owed-content gap.
 - Saving a changed, active row while committed upcoming bookings exist asks
@@ -201,8 +202,8 @@ Under Content → Entry requirements. There is one row per destination country
 - Retiring never asks and tells nobody by itself. It lists the bookings that
   lose the advice, for contact by hand. Notices already due from an earlier
   "Tell them" still go out once the change template is on.
-- "Owed" notices, on the list and the dashboard's content overview, are due (not yet queued) plus
-  failed. A queued notice is on its way.
+- "Owed" notices, on the list and the dashboard's content overview, are due
+  (not yet queued) plus failed. A queued notice is on its way.
 - The Booked travellers card is the manual channel while mail is off.
 - The country select on destinations and the Settings "Entry requirements"
   card feed the same advice.

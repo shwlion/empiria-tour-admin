@@ -262,3 +262,177 @@ export function validateEntryRequirement(
     },
   };
 }
+
+// ─── s.37: the travellers already booked ─────────────────────────────────
+
+/** A booking that is the traveller's: something paid, not cancelled. 0036's functions count the same three. */
+export const COMMITTED_STATUSES = ['confirmed', 'balance_due', 'paid_in_full'] as const;
+
+/** The change-notice email Loop B sends (0036). */
+export const CHANGE_TEMPLATE = 'entry_requirements_changed';
+
+/** The database's `current_date`, which is UTC: 0036 counts "upcoming" from it, and so does this. */
+const utcToday = () => new Date().toISOString().slice(0, 10);
+
+export type BookedTraveller = {
+  bookingId: string;
+  reference: string;
+  leadName: string;
+  leadEmail: string;
+  startsOn: string;
+  passportSource: 'profile' | 'default';
+  advisedVersion: number | null;
+  acceptedAt: string | null;
+  sawCurrent: boolean;
+  noticeDue: boolean;
+  noticeKey: string | null;
+};
+
+export type NoticeStatus = 'none' | 'due' | 'queued' | 'sent' | 'failed';
+
+/**
+ * Committed bookings on upcoming, non-cancelled departures, platform-wide.
+ * The form asks the s.37 question only when there are some, and the save
+ * counts again rather than trusting a page that may be minutes old.
+ */
+export async function countCommittedUpcoming(): Promise<number> {
+  const db = getSupabaseAdmin();
+  if (!db) return 0;
+  const { count, error } = await db
+    .from('bookings')
+    .select('id, departures!inner ( starts_on, status )', { count: 'exact', head: true })
+    .in('status', [...COMMITTED_STATUSES])
+    .gte('departures.starts_on', utcToday())
+    .neq('departures.status', 'cancelled');
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Who was advised for this row's destination and passport and is still going:
+ * `entry_advice_bookings` (0036), plus the outbox's status for each one's
+ * notice under the current revision, keyed by dedupe key. An error is
+ * returned, not swallowed: "nobody booked" and "could not look" must not look
+ * the same on a card that decides who gets told.
+ */
+export async function listBookedTravellers(
+  requirementId: string
+): Promise<{ rows: BookedTraveller[]; messages: Record<string, string>; error: string | null }> {
+  const db = getSupabaseAdmin();
+  if (!db) return { rows: [], messages: {}, error: null };
+  const { data, error } = await db.rpc('entry_advice_bookings', { p_requirement: requirementId });
+  if (error) return { rows: [], messages: {}, error: error.message };
+
+  const rows: BookedTraveller[] = (data ?? [])
+    .map((r) => ({
+      bookingId: r.booking_id,
+      reference: r.reference,
+      leadName: r.lead_name,
+      leadEmail: r.lead_email,
+      startsOn: r.starts_on,
+      passportSource: r.passport_source === 'profile' ? ('profile' as const) : ('default' as const),
+      advisedVersion: r.advised_version ?? null,
+      acceptedAt: r.accepted_at ?? null,
+      sawCurrent: r.saw_current === true,
+      noticeDue: r.notice_due === true,
+      noticeKey: r.notice_key ?? null,
+    }))
+    .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.reference.localeCompare(b.reference));
+
+  // Exact keys, fifty to a request: each is about a hundred characters, and
+  // they travel in the request's address.
+  const keys = rows.map((r) => r.noticeKey).filter((k): k is string => k !== null);
+  const messages: Record<string, string> = {};
+  for (let i = 0; i < keys.length; i += 50) {
+    const { data: found, error: readError } = await db
+      .from('email_messages')
+      .select('dedupe_key, status')
+      .in('dedupe_key', keys.slice(i, i + 50));
+    if (readError) return { rows, messages: {}, error: readError.message };
+    for (const m of found ?? []) if (m.dedupe_key) messages[m.dedupe_key] = m.status;
+  }
+  return { rows, messages, error: null };
+}
+
+/**
+ * Whether a save must ask "tell them, or a correction?" (spec §6): the row is
+ * active after the save; its advice changed, or it was put in front of
+ * travellers (a new row, an activation, a re-activation); and committed
+ * bookings on upcoming departures exist anywhere on the platform. Retiring, a
+ * status-only change to draft or retired, and a checked-only save never ask.
+ * Pure, and asserted in `entryRequirements.test.ts`.
+ */
+export function noticeDecisionNeeded(input: {
+  beforeStatus: string | null;
+  afterStatus: string;
+  contentChanged: boolean;
+  bookingsExist: boolean;
+}): boolean {
+  if (input.afterStatus !== 'active' || !input.bookingsExist) return false;
+  return input.contentChanged || input.beforeStatus !== 'active';
+}
+
+/**
+ * One booking's notice under the row's current revision: the outbox's word
+ * when a message exists under its key, otherwise due or nothing. "Queued"
+ * covers sending; nothing says "sent" unless the outbox did. Nothing in the
+ * platform cancels an email today; if something ever does, the traveller was
+ * still not told, so it reads as failed. Pure, and asserted in
+ * `entryRequirements.test.ts`.
+ */
+export function noticeStatus(row: BookedTraveller, messageStatus: string | undefined): NoticeStatus {
+  if (messageStatus === 'sent') return 'sent';
+  if (messageStatus === 'queued' || messageStatus === 'sending') return 'queued';
+  if (messageStatus === 'failed' || messageStatus === 'cancelled') return 'failed';
+  return row.noticeDue ? 'due' : 'none';
+}
+
+/**
+ * Whether Loop B can send at all: the change email is switched on, with a
+ * subject and a body, as 0036's scan requires. Null when it could not be
+ * read, so a caller says nothing rather than something wrong.
+ */
+export async function noticeTemplateReady(): Promise<boolean | null> {
+  const db = getSupabaseAdmin();
+  if (!db) return null;
+  const { data, error } = await db
+    .from('email_templates')
+    .select('is_active, subject, body_html')
+    .eq('key', CHANGE_TEMPLATE)
+    .maybeSingle();
+  if (error) return null;
+  return Boolean(data && data.is_active && data.subject.trim() && data.body_html.trim());
+}
+
+export type OwedNotices = { requirementId: string; label: string; due: number; failed: number; unshown: number; uncovered: number };
+
+/**
+ * For each active row, the bookings not yet told:
+ * `due` has no message yet, `failed` failed to send, and `unshown` is queued
+ * but not sent, so the traveller has not seen it. `uncovered` counts bookings
+ * never shown this row's current wording that no notice will reach: brought
+ * into scope by a destination, country or row change, or by a "correction"
+ * on a new row (spec §7, "bookings brought into scope"). Rows with none are
+ * left out.
+ */
+export async function listOwedNotices(rows: EntryRequirementRecord[]): Promise<{ owed: OwedNotices[]; error: string | null }> {
+  const told = rows.filter((r) => r.status === 'active');
+  const results = await Promise.all(told.map((r) => listBookedTravellers(r.id)));
+  const owed: OwedNotices[] = [];
+  for (let i = 0; i < told.length; i++) {
+    const { rows: booked, messages, error } = results[i];
+    if (error) return { owed: [], error };
+    const count = { due: 0, failed: 0, unshown: 0, uncovered: 0 };
+    for (const b of booked) {
+      const status = noticeStatus(b, b.noticeKey ? messages[b.noticeKey] : undefined);
+      if (status === 'due') count.due++;
+      else if (status === 'failed') count.failed++;
+      else if (status === 'queued') count.unshown++;
+      if (!b.sawCurrent && !b.noticeDue) count.uncovered++;
+    }
+    if (count.due + count.failed + count.unshown + count.uncovered > 0) {
+      owed.push({ requirementId: told[i].id, label: pairLabel(told[i].destinationCountry, told[i].passportCountry), ...count });
+    }
+  }
+  return { owed, error: null };
+}

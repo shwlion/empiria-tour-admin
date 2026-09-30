@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { isCountryCode } from '@/lib/countries';
-import { getEntrySettings } from '@/lib/admin/entryRequirements';
+import { countCommittedUpcoming, getEntrySettings } from '@/lib/admin/entryRequirements';
 import EntryRequirementForm from '../EntryRequirementForm';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export default async function NewEntryRequirementPage({
   searchParams: Promise<{ destination?: string; passport?: string }>;
 }) {
   const { destination, passport } = await searchParams;
-  const settings = await getEntrySettings();
+  const [settings, committedUpcoming] = await Promise.all([getEntrySettings(), countCommittedUpcoming()]);
   return (
     <>
       <Link
@@ -27,6 +27,7 @@ export default async function NewEntryRequirementPage({
       <EntryRequirementForm
         record={null}
         settings={settings}
+        committedUpcoming={committedUpcoming}
         preset={{
           destination: isCountryCode(destination) ? destination : null,
           passport: isCountryCode(passport) ? passport : null,

@@ -6,7 +6,12 @@ import { formatDepartureDate } from '@/lib/money';
 import { countryName } from '@/lib/countries';
 import { REQUIREMENT_CAPTIONS } from '@/lib/entryAdvice';
 import { listDestinations } from '@/lib/admin/destinations';
-import { listEntryRequirements, type EntryRequirementRecord } from '@/lib/admin/entryRequirements';
+import {
+  listEntryRequirements,
+  listOwedNotices,
+  type EntryRequirementRecord,
+  type OwedNotices,
+} from '@/lib/admin/entryRequirements';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Entry requirements · Empiria Tour Admin' };
@@ -19,6 +24,9 @@ const PATH = '/dashboard/content/entry-requirements';
  * first in each group, because it is TICO's online minimum and what anyone
  * without a profile country is shown.
  */
+/** "2 due · 1 failed": the notices of the current revision nobody has seen yet. */
+const owedText = (o: OwedNotices) =>
+  [o.due && `${o.due} due`, o.failed && `${o.failed} failed`, o.unshown && `${o.unshown} queued`, o.uncovered && `${o.uncovered} never shown`].filter(Boolean).join(' · ');
 /** Canada first, then by the passport country's name. */
 const byPassport = (a: EntryRequirementRecord, b: EntryRequirementRecord) =>
   Number(b.passportCountry === 'CA') - Number(a.passportCountry === 'CA') ||
@@ -35,6 +43,8 @@ export default async function EntryRequirementsPage() {
     listDestinations(),
   ]);
   const { rows, error: loadError } = loaded;
+  const notices = await listOwedNotices(rows);
+  const owedBy = new Map(notices.owed.map((o) => [o.requirementId, o]));
 
   const codes = new Set<string>();
   for (const d of destinations) if (d.countryCode) codes.add(d.countryCode);
@@ -57,6 +67,7 @@ export default async function EntryRequirementsPage() {
       </div>
 
       {loadError && <Banner tone="error">The rows could not be loaded just now: {loadError}</Banner>}
+      {notices.error && <Banner tone="error">Owed notices could not be counted just now: {notices.error}</Banner>}
 
       {countries.length === 0 ? (
         <EmptyState
@@ -81,20 +92,24 @@ export default async function EntryRequirementsPage() {
                   </p>
                 ) : (
                   <ul className="mb-3 flex flex-col divide-y divide-border">
-                    {group.map((r) => (
-                      <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-                        <div className="min-w-0">
-                          <Link href={`${PATH}/${r.id}`} className="text-[13px] font-medium text-foreground transition-colors hover:text-primary">
-                            {countryName(r.passportCountry) ?? r.passportCountry} passport
-                          </Link>
-                          <span className="ml-2 text-[12px] text-muted-foreground">{REQUIREMENT_CAPTIONS[r.requirement]}</span>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
-                          <span>{r.checkedOn ? `Checked ${formatDepartureDate(r.checkedOn)}` : 'Never checked'}</span>
-                          <Badge value={r.status} />
-                        </div>
-                      </li>
-                    ))}
+                    {group.map((r) => {
+                      const owed = owedBy.get(r.id);
+                      return (
+                        <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                          <div className="min-w-0">
+                            <Link href={`${PATH}/${r.id}`} className="text-[13px] font-medium text-foreground transition-colors hover:text-primary">
+                              {countryName(r.passportCountry) ?? r.passportCountry} passport
+                            </Link>
+                            <span className="ml-2 text-[12px] text-muted-foreground">{REQUIREMENT_CAPTIONS[r.requirement]}</span>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-3 text-[12px] text-muted-foreground">
+                            {owed && <span className="font-medium text-destructive">Notices owed: {owedText(owed)}</span>}
+                            <span>{r.checkedOn ? `Checked ${formatDepartureDate(r.checkedOn)}` : 'Never checked'}</span>
+                            <Badge value={r.status} />
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
                 <Link href={`${PATH}/new?destination=${code}`}>

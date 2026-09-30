@@ -1,8 +1,9 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Banner, Card, Checkbox, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
+import { Archive } from 'lucide-react';
+import { Banner, Button, Card, Checkbox, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import { COUNTRIES, countryName, isCountryCode } from '@/lib/countries';
 import {
@@ -17,8 +18,15 @@ import {
   type ResolvedEntry,
   type Urgency,
 } from '@/lib/entryAdvice';
-import { REQUIREMENT_KINDS, parseApplyDaysBefore, tidyHeadline, type EntryRequirementRecord } from '@/lib/admin/entryRequirements';
-import { saveEntryRequirementAction } from './actions';
+import {
+  REQUIREMENT_KINDS,
+  contentChanged,
+  noticeDecisionNeeded,
+  parseApplyDaysBefore,
+  tidyHeadline,
+  type EntryRequirementRecord,
+} from '@/lib/admin/entryRequirements';
+import { retireEntryRequirementAction, saveEntryRequirementAction, type AffectedBooking } from './actions';
 
 /**
  * One destination × passport row: Empiria's headline, words and lead time,
@@ -36,14 +44,31 @@ const STATUS_LABELS: Record<string, string> = {
 /** As the save stores it: one kind of line break, trimmed, blank as null. */
 const tidy = (value: string) => value.replace(/\r\n?/g, '\n').trim();
 
+/** The two answers to the s.37 question (ours, for Empiria's sign-off). There is no default. */
+const NOTICE_CHOICES = [
+  {
+    value: 'tell',
+    label: 'Tell them',
+    hint: 'Records a notice. Travellers advised under older wording, or with no row for their passport, are sent the current wording by the next send run, once the “Entry requirements changed” email is on. Until then, contact them from the Booked travellers card.',
+  },
+  {
+    value: 'correction',
+    label: 'Don’t tell them — this is a correction',
+    hint: 'Nobody already booked is told. For a typo, or wording that changes nothing a traveller must do.',
+  },
+];
+
 export default function EntryRequirementForm({
   record,
   settings,
+  committedUpcoming,
   preset,
 }: {
   record: EntryRequirementRecord | null;
   /** The disclaimer and other-passport text from Settings, for the preview. */
   settings: EntrySettings;
+  /** Committed bookings on upcoming departures, platform-wide. The save counts again. */
+  committedUpcoming: number;
   /** For a new row: the countries "Add a passport" was pressed for. */
   preset: { destination: string | null; passport: string | null };
 }) {
@@ -66,6 +91,8 @@ export default function EntryRequirementForm({
   const [applyUrl, setApplyUrl] = useState(record?.applyUrl ?? '');
   const [officialUrl, setOfficialUrl] = useState(record?.officialUrl ?? '');
   const [status, setStatus] = useState<string>(record?.status ?? 'draft');
+  const [retiring, startRetire] = useTransition();
+  const [retired, setRetired] = useState<ActionResult<{ affected: AffectedBooking[] }> | null>(null);
 
   // A new row lands on its own page once it exists.
   useEffect(() => {
@@ -99,12 +126,37 @@ export default function EntryRequirementForm({
   const alert = resolved ? entryAlert(resolved) : null;
   const advice = resolved ? composeEntryAdvice(resolved, settings) : null;
 
-  const statuses = record?.status === 'retired' ? ['retired', 'draft', 'active'] : ['draft', 'active'];
+  const statuses = record?.status === 'retired' || status === 'retired' ? ['retired', 'draft', 'active'] : ['draft', 'active'];
+
+  // The server decides again on save; this only decides whether to show the
+  // question. A refusal for want of an answer shows it regardless.
+  const askNotice =
+    noticeDecisionNeeded({
+      beforeStatus: record?.status ?? null,
+      afterStatus: status,
+      contentChanged: contentChanged(record, current),
+      bookingsExist: committedUpcoming > 0,
+    }) || Boolean(err('notice'));
 
   return (
     <form action={formAction} className="flex max-w-3xl flex-col gap-5">
       {state?.ok && <Banner tone="success">{state.message}</Banner>}
       {state && !state.ok && <Banner tone="error">{state.message}</Banner>}
+      {retired && !retired.ok && <Banner tone="error">{retired.message}</Banner>}
+      {retired?.ok && (
+        <Banner tone="info">
+          <p className="font-medium text-foreground">{retired.message}</p>
+          {(retired.data?.affected.length ?? 0) > 0 && (
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+              {retired.data?.affected.map((a) => (
+                <li key={a.reference}>
+                  {a.reference} — {a.leadName}, {a.leadEmail}, departs {a.startsOn}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Banner>
+      )}
 
       <Card
         title="Who it is for"
@@ -307,7 +359,53 @@ export default function EntryRequirementForm({
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      {askNotice && (
+        <Card
+          title="People already booked"
+          description={`Travellers hold bookings on upcoming departures, and this save changes what someone on a ${countryName(passport) ?? 'this'} passport is shown for ${countryName(destination) ?? 'this country'}. Choose whether to tell those already booked. There is no default.`}
+        >
+          <fieldset className="flex flex-col gap-2">
+            <legend className="sr-only">Tell the travellers already booked?</legend>
+            {NOTICE_CHOICES.map((choice) => (
+              <label
+                key={choice.value}
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 transition-colors hover:border-primary"
+              >
+                <input type="radio" name="notice" value={choice.value} required className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+                <span>
+                  <span className="block text-[13px] font-medium text-foreground">{choice.label}</span>
+                  <span className="block text-[12px] leading-relaxed text-muted-foreground">{choice.hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          {err('notice') && <p className="mt-2 text-[12px] font-medium text-destructive">{err('notice')}</p>}
+        </Card>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {record && record.status !== 'retired' && !retired?.ok ? (
+          <Button
+            type="button"
+            variant="danger"
+            disabled={retiring}
+            onClick={() => {
+              if (!window.confirm('Retire this row? Travellers on this passport see the other-passport text instead. Nobody already booked is told; the Booked travellers card lists who to contact.')) return;
+              setRetired(null);
+              startRetire(async () => {
+                const result = await retireEntryRequirementAction(record.id);
+                setRetired(result);
+                // The page reloads the row; the select must not keep offering the old status.
+                if (result.ok) setStatus('retired');
+              });
+            }}
+          >
+            <Archive size={14} aria-hidden="true" />
+            Retire
+          </Button>
+        ) : (
+          <span />
+        )}
         <SubmitButton>{record ? 'Save' : 'Create'}</SubmitButton>
       </div>
     </form>

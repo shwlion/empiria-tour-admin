@@ -2,15 +2,19 @@ import { explain } from '@/lib/actions';
 import {
   contentChanged,
   isHttpsAddress,
+  noticeDecisionNeeded,
+  noticeStatus,
   pairLabel,
   parseApplyDaysBefore,
   validateEntryRequirement,
+  type BookedTraveller,
   type EntryRequirementDraft,
 } from './entryRequirements';
 
 /**
- * Entry requirements (0036): what counts as a change to the advice, and what
- * a save accepts.
+ * Entry requirements (0036): what counts as a change to the advice, what a
+ * save accepts, when it must ask about the travellers already booked (s.37),
+ * and what the Booked travellers card says about each notice.
  *
  *   bun run lib/admin/entryRequirements.test.ts
  */
@@ -118,6 +122,40 @@ eq('the unique pair is explained', silent(() => explain({ message: 'duplicate ke
 eq('the headline check is explained', silent(() => explain({ message: 'violates check constraint "entry_requirements_headline_check"' })), 'Keep the headline to 160 characters or fewer.');
 
 eq('a pair is named by its countries', pairLabel('GR', 'CA'), 'Greece · Canada passport');
+
+// ── when a save asks "tell them, or a correction?" ──────────────────────────
+const ask = (beforeStatus: string | null, afterStatus: string, changed: boolean, bookingsExist = true) =>
+  noticeDecisionNeeded({ beforeStatus, afterStatus, contentChanged: changed, bookingsExist });
+eq('a content change to an active row asks', ask('active', 'active', true), true);
+eq('activating a draft asks, even with the wording unchanged', ask('draft', 'active', false), true);
+eq('a new row saved active asks', ask(null, 'active', true), true);
+eq('re-activating a retired row asks', ask('retired', 'active', false), true);
+eq('retiring does not ask', ask('active', 'retired', false), false);
+eq('retiring with the wording changed still does not ask', ask('active', 'retired', true), false);
+eq('a status-only change to draft does not ask', ask('active', 'draft', false), false);
+eq('a checked-only save does not ask', ask('active', 'active', false), false);
+eq('editing a draft does not ask — nobody sees it', ask('draft', 'draft', true), false);
+eq('a new row saved as a draft does not ask', ask(null, 'draft', true), false);
+eq('no committed upcoming bookings: nobody to tell, no question', ask('active', 'active', true, false), false);
+eq('v2: a new headline on an active row asks', ask('active', 'active', contentChanged(content, { ...content, headline: 'Apply for an eVisa a month before you fly.' })), true);
+eq('v2: a new lead time on an active row asks', ask('active', 'active', contentChanged(content, { ...content, applyDaysBefore: 45 })), true);
+
+// ── what the card says about each notice ────────────────────────────────────
+const booked = (o: Partial<BookedTraveller> = {}): BookedTraveller => ({
+  bookingId: 'b1', reference: 'EMP-1', leadName: 'Ana', leadEmail: 'ana@example.com', startsOn: '2026-11-02',
+  passportSource: 'profile', advisedVersion: 1, acceptedAt: '2026-09-01T10:00:00Z', sawCurrent: false,
+  noticeDue: false, noticeKey: null, ...o,
+});
+const dueRow = booked({ noticeDue: true, noticeKey: 'entry_requirements_changed:b1:r1:1' });
+eq('no revision, no message: nothing to say', noticeStatus(booked(), undefined), 'none');
+eq('shown the current version: nothing to say', noticeStatus(booked({ sawCurrent: true, advisedVersion: 2 }), undefined), 'none');
+eq('due and no message yet: due', noticeStatus(dueRow, undefined), 'due');
+eq('queued in the outbox: queued, never "sent"', noticeStatus(dueRow, 'queued'), 'queued');
+eq('being sent counts as queued', noticeStatus(dueRow, 'sending'), 'queued');
+eq('the outbox says sent: sent', noticeStatus(dueRow, 'sent'), 'sent');
+eq('the outbox says failed: failed', noticeStatus(dueRow, 'failed'), 'failed');
+eq('a cancelled message still means not told: failed', noticeStatus(dueRow, 'cancelled'), 'failed');
+eq('the message outranks the due flag', noticeStatus(booked({ noticeDue: false, noticeKey: 'k' }), 'sent'), 'sent');
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
 process.exit(failed === 0 ? 0 : 1);

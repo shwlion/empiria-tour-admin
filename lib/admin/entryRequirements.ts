@@ -90,6 +90,19 @@ export async function listEntryRequirements(): Promise<EntryRequirementRecord[]>
   return (data ?? []).map(toRecord);
 }
 
+/**
+ * Every country a destination is coded with: the list page's groups. Throws
+ * on a failed read, like the readers above; `listDestinations` would return
+ * no places, which the page would show as "no countries".
+ */
+export async function listDestinationCountries(): Promise<string[]> {
+  const db = getSupabaseAdmin();
+  if (!db) return [];
+  const { data, error } = await db.from('destinations').select('country_code').limit(2000);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((d) => d.country_code).filter((c): c is string => c !== null))];
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function getEntryRequirement(id: string): Promise<EntryRequirementRecord | null> {

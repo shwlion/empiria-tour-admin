@@ -5,8 +5,8 @@ import { Badge, Banner, Button, Card, EmptyState } from '@/components/ui';
 import { formatDepartureDate } from '@/lib/money';
 import { countryName } from '@/lib/countries';
 import { REQUIREMENT_CAPTIONS } from '@/lib/entryAdvice';
-import { listDestinations } from '@/lib/admin/destinations';
 import {
+  listDestinationCountries,
   listEntryRequirements,
   listOwedNotices,
   type EntryRequirementRecord,
@@ -35,19 +35,21 @@ const byPassport = (a: EntryRequirementRecord, b: EntryRequirementRecord) =>
 export default async function EntryRequirementsPage() {
   // A failed read is said out loud: an empty page here would read as "nothing
   // written", which is a different answer.
-  const [loaded, destinations] = await Promise.all([
+  const [loaded, coded] = await Promise.all([
     listEntryRequirements().then(
       (rows) => ({ rows, error: null }),
       (e: unknown) => ({ rows: [] as EntryRequirementRecord[], error: (e as { message?: string } | null)?.message ?? 'unknown error' })
     ),
-    listDestinations(),
+    listDestinationCountries().then(
+      (codes) => ({ codes, error: null }),
+      (e: unknown) => ({ codes: [] as string[], error: (e as { message?: string } | null)?.message ?? 'unknown error' })
+    ),
   ]);
   const { rows, error: loadError } = loaded;
   const notices = await listOwedNotices(rows);
   const owedBy = new Map(notices.owed.map((o) => [o.requirementId, o]));
 
-  const codes = new Set<string>();
-  for (const d of destinations) if (d.countryCode) codes.add(d.countryCode);
+  const codes = new Set<string>(coded.codes);
   for (const r of rows) codes.add(r.destinationCountry);
   const countries = [...codes].sort((a, b) => (countryName(a) ?? a).localeCompare(countryName(b) ?? b));
 
@@ -67,13 +69,21 @@ export default async function EntryRequirementsPage() {
       </div>
 
       {loadError && <Banner tone="error">The rows could not be loaded just now: {loadError}</Banner>}
+      {coded.error && (
+        <Banner tone="error">
+          The destination countries could not be loaded just now, so a country with no rows is missing below: {coded.error}
+        </Banner>
+      )}
       {notices.error && <Banner tone="error">Owed notices could not be counted just now: {notices.error}</Banner>}
 
       {countries.length === 0 ? (
-        <EmptyState
-          title="No destination countries yet"
-          description="Give each country in Content → Destinations its code first. Every coded country gets a group here."
-        />
+        // Not "no countries yet" when the countries could not be read.
+        coded.error ? null : (
+          <EmptyState
+            title="No destination countries yet"
+            description="Give each country in Content → Destinations its code first. Every coded country gets a group here."
+          />
+        )
       ) : (
         <div className="flex flex-col gap-5">
           {countries.map((code) => {

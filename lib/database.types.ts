@@ -237,6 +237,69 @@ export type Database = {
           },
         ]
       }
+      booking_entry_advice: {
+        Row: {
+          accepted_at: string | null
+          body_snapshot: string
+          booking_id: string
+          created_at: string
+          destination_country: string | null
+          ip_address: unknown
+          kind: string
+          label: string
+          passport_country: string
+          passport_source: string
+          requirement_id: string | null
+          requirement_version: number | null
+          user_agent: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          body_snapshot?: string
+          booking_id: string
+          created_at?: string
+          destination_country?: string | null
+          ip_address?: unknown
+          kind: string
+          label?: string
+          passport_country: string
+          passport_source: string
+          requirement_id?: string | null
+          requirement_version?: number | null
+          user_agent?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          body_snapshot?: string
+          booking_id?: string
+          created_at?: string
+          destination_country?: string | null
+          ip_address?: unknown
+          kind?: string
+          label?: string
+          passport_country?: string
+          passport_source?: string
+          requirement_id?: string | null
+          requirement_version?: number | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_entry_advice_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_entry_advice_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "entry_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_holds: {
         Row: {
           booking_id: string | null
@@ -760,6 +823,7 @@ export type Database = {
       }
       destinations: {
         Row: {
+          country_code: string | null
           created_at: string
           description: string | null
           hero_image: string | null
@@ -775,6 +839,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           description?: string | null
           hero_image?: string | null
@@ -790,6 +855,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           description?: string | null
           hero_image?: string | null
@@ -1028,6 +1094,83 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      entry_requirements: {
+        Row: {
+          apply_days_before: number | null
+          apply_url: string | null
+          before_arrival: string
+          checked_on: string | null
+          content_changed_at: string | null
+          content_version: number
+          created_at: string
+          destination_country: string
+          headline: string | null
+          id: string
+          notice_revised_at: string | null
+          notice_revision: number
+          official_url: string | null
+          passport_country: string
+          processing_time: string | null
+          requirement: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          why: string | null
+        }
+        Insert: {
+          apply_days_before?: number | null
+          apply_url?: string | null
+          before_arrival: string
+          checked_on?: string | null
+          content_changed_at?: string | null
+          content_version?: number
+          created_at?: string
+          destination_country: string
+          headline?: string | null
+          id?: string
+          notice_revised_at?: string | null
+          notice_revision?: number
+          official_url?: string | null
+          passport_country: string
+          processing_time?: string | null
+          requirement: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          why?: string | null
+        }
+        Update: {
+          apply_days_before?: number | null
+          apply_url?: string | null
+          before_arrival?: string
+          checked_on?: string | null
+          content_changed_at?: string | null
+          content_version?: number
+          created_at?: string
+          destination_country?: string
+          headline?: string | null
+          id?: string
+          notice_revised_at?: string | null
+          notice_revision?: number
+          official_url?: string | null
+          passport_country?: string
+          processing_time?: string | null
+          requirement?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          why?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entry_requirements_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       itinerary_days: {
         Row: {
@@ -1610,6 +1753,9 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           default_currency: string
+          entry_reminder_days: number
+          entry_requirements_disclaimer: string | null
+          entry_requirements_other_passport: string | null
           hold_minutes: number
           id: boolean
           installment_reminder_days: number
@@ -1634,6 +1780,9 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           default_currency?: string
+          entry_reminder_days?: number
+          entry_requirements_disclaimer?: string | null
+          entry_requirements_other_passport?: string | null
           hold_minutes?: number
           id?: boolean
           installment_reminder_days?: number
@@ -1658,6 +1807,9 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           default_currency?: string
+          entry_reminder_days?: number
+          entry_requirements_disclaimer?: string | null
+          entry_requirements_other_passport?: string | null
           hold_minutes?: number
           id?: boolean
           installment_reminder_days?: number
@@ -2139,6 +2291,7 @@ export type Database = {
           full_name: string | null
           id: string
           marketing_opt_in: boolean
+          passport_country: string | null
           phone: string | null
           role: string
           status: string
@@ -2151,6 +2304,7 @@ export type Database = {
           full_name?: string | null
           id: string
           marketing_opt_in?: boolean
+          passport_country?: string | null
           phone?: string | null
           role?: string
           status?: string
@@ -2163,6 +2317,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           marketing_opt_in?: boolean
+          passport_country?: string | null
           phone?: string | null
           role?: string
           status?: string
@@ -2333,6 +2488,54 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_booking_with_entry_advice: {
+        Args: { p_advice: Json; p_payload: Json }
+        Returns: {
+          access_token: string
+          adults: number
+          amount_paid_cents: number
+          balance_cents: number | null
+          balance_due_on: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          checkout_session_ref: string | null
+          children: number
+          created_at: string
+          currency: string
+          departure_id: string
+          deposit_due_cents: number
+          discount_cents: number
+          fees_cents: number
+          fx_rate_to_base: number | null
+          id: string
+          infants: number
+          lead_address: Json | null
+          lead_email: string
+          lead_name: string
+          lead_phone: string | null
+          notes_internal: string | null
+          package_id: string
+          promotion_id: string | null
+          reference: string
+          room_type_id: string | null
+          single_supplement: boolean
+          status: string
+          subtotal_cents: number
+          supplier_cost_base_cents: number | null
+          supplier_cost_cents: number | null
+          tax_cents: number
+          total_base_cents: number | null
+          total_cents: number
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_role: { Args: never; Returns: string }
       departure_seats_available: {
         Args: { d: Database["public"]["Tables"]["departures"]["Row"] }
@@ -2344,6 +2547,65 @@ export type Database = {
       }
       enqueue_due_reminders: { Args: never; Returns: number }
       enqueue_email: { Args: { p_payload: Json }; Returns: string }
+      enqueue_entry_requirements_mail: { Args: never; Returns: number }
+      entry_advice_bookings: {
+        Args: { p_requirement: string }
+        Returns: {
+          accepted_at: string
+          advised_version: number
+          booking_id: string
+          created_at: string
+          currency: string
+          departure_id: string
+          lead_email: string
+          lead_name: string
+          notice_due: boolean
+          notice_key: string
+          package_title: string
+          passport_source: string
+          reference: string
+          saw_current: boolean
+          starts_on: string
+          status: string
+          user_id: string
+        }[]
+      }
+      entry_requirement_by_country: {
+        Args: { p_destination: string; p_passport: string }
+        Returns: {
+          apply_days_before: number
+          apply_url: string
+          before_arrival: string
+          content_version: number
+          destination_country: string
+          headline: string
+          official_url: string
+          passport_country: string
+          processing_time: string
+          requirement: string
+          requirement_id: string
+          state: string
+          why: string
+        }[]
+      }
+      entry_requirement_for: {
+        Args: { p_package: string; p_passport: string }
+        Returns: {
+          apply_days_before: number
+          apply_url: string
+          before_arrival: string
+          content_version: number
+          destination_country: string
+          headline: string
+          official_url: string
+          passport_country: string
+          processing_time: string
+          requirement: string
+          requirement_id: string
+          state: string
+          why: string
+        }[]
+      }
       expire_stale_holds: { Args: { p_departure?: string }; Returns: number }
       extend_booking_hold: {
         Args: { p_booking: string; p_until: string }
@@ -2375,6 +2637,7 @@ export type Database = {
       }
       next_booking_reference: { Args: never; Returns: string }
       owns_package: { Args: { pkg: string }; Returns: boolean }
+      package_country: { Args: { p_package: string }; Returns: string }
       publish_blog_post: {
         Args: { p_actor: string; p_post: string }
         Returns: undefined

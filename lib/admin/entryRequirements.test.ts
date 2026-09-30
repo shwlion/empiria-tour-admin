@@ -11,6 +11,7 @@ import {
   offerSendCurrent,
   pairLabel,
   parseApplyDaysBefore,
+  staleNoticeRevision,
   validateEntryRequirement,
   type BookedTraveller,
   type EntryGapInput,
@@ -260,6 +261,15 @@ eq('all due under revision 1 but the wording changed after the stamp: offered', 
 eq('revision 0 with older bookings: offered', offer({ noticeRevision: 0, noticeRevisedAt: null }), true);
 eq('a revision with no stamp and changed wording: offered', offer({ noticeRevisedAt: null }), true);
 eq('a revision, wording never changed: not offered', offer({ contentChangedAt: null }), false);
+
+// ── "Send the current wording" from a page that is out of date ──────────────
+eq('the page saw the row\'s revision: sends', staleNoticeRevision(3, 3), false);
+eq('someone recorded a notice since the page loaded: refused', staleNoticeRevision(2, 3), true);
+eq('a revision ahead of the row: refused', staleNoticeRevision(4, 3), true);
+eq('revision 0, never told: sends', staleNoticeRevision(0, 0), false);
+eq('no revision sent: refused', staleNoticeRevision(undefined, 0), true);
+eq('a revision as text: refused', staleNoticeRevision('3', 3), true);
+eq('not a whole number: refused', [1.5, Number.NaN, -1, Number.POSITIVE_INFINITY].map((n) => staleNoticeRevision(n, 1)), [true, true, true, true]);
 
 // ── retry: one test for "failed", on the card and in the action ─────────────
 const keyed = (k: string) => booked({ bookingId: k, noticeKey: k, noticeDue: true });

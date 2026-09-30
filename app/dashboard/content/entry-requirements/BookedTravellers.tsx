@@ -121,7 +121,8 @@ export default function BookedTravellers({
               disabled={pending}
               onClick={() => {
                 if (!window.confirm(`Record a notice? All ${older} booked ${older === 1 ? 'traveller' : 'travellers'} advised under older wording will be sent the current wording by the next send run, including any already sent an earlier notice.`)) return;
-                run(() => notifyEntryRequirementAction(record.id));
+                // The revision this card was loaded with: a stale tab is refused.
+                run(() => notifyEntryRequirementAction(record.id, record.noticeRevision));
               }}
             >
               <Send size={14} aria-hidden="true" />

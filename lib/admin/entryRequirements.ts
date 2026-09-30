@@ -641,6 +641,18 @@ export function offerSendCurrent(input: {
 }
 
 /**
+ * Whether "Send the current wording…" comes from a page that is out of
+ * date: the `notice_revision` the page was loaded with is not the row's now
+ * (someone recorded a notice since, from another tab or another desk), or
+ * is not a revision at all. The button's action is public, so the value is
+ * checked here rather than trusted. Pure, and asserted in
+ * `entryRequirements.test.ts`.
+ */
+export function staleNoticeRevision(seen: unknown, current: number): boolean {
+  return !(typeof seen === 'number' && Number.isInteger(seen) && seen >= 0 && seen === current);
+}
+
+/**
  * The dedupe keys of notices that can be released for retry: those the outbox
  * says `failed`. A `cancelled` message reads as failed on the card but the
  * retry cannot release it (the update matches `status = 'failed'`), so the

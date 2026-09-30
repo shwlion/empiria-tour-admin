@@ -17,6 +17,7 @@ import {
   noticeTemplateReady,
   failedNoticeKeys,
   pairLabel,
+  staleNoticeRevision,
   validateEntryRequirement,
 } from '@/lib/admin/entryRequirements';
 
@@ -338,8 +339,13 @@ export async function retireEntryRequirementAction(id: string): Promise<ActionRe
  * wording": records a revision, exactly as "Tell them" does, for a change that
  * was saved as a correction and should not have been, or whose "Tell them"
  * was not recorded. Loop B does the sending.
+ *
+ * The bump is keyed on `seenRevision`, the revision the card was loaded
+ * with, as the save's is keyed on the revision it read. A second click from
+ * a stale tab or another desk is refused rather than recorded, so it never
+ * sends every older booking a second notice.
  */
-export async function notifyEntryRequirementAction(id: string): Promise<ActionResult> {
+export async function notifyEntryRequirementAction(id: string, seenRevision: number): Promise<ActionResult> {
   const user = await requireCapability('manageSettings');
   try {
     const db = requireWritableDb();
@@ -351,6 +357,11 @@ export async function notifyEntryRequirementAction(id: string): Promise<ActionRe
     if (readError) throw readError;
     if (!row) return fail('That row no longer exists. Reload the list.');
     if (row.status !== 'active') return fail('Only an active row can be sent: travellers are shown active rows only.');
+    if (staleNoticeRevision(seenRevision, row.notice_revision)) {
+      return fail(
+        'Someone already recorded a notice on this row after this page loaded, so nothing was recorded again. Reload the page to see where the notices stand.'
+      );
+    }
 
     const booked = await listBookedTravellers(id);
     if (booked.error) return fail(`The booked travellers could not be read: ${booked.error}`);
@@ -358,7 +369,7 @@ export async function notifyEntryRequirementAction(id: string): Promise<ActionRe
       return fail('Every booked traveller was advised under the current wording. There is nothing to send.');
     }
 
-    const attempt = await bumpNoticeRevision(db, id, row.notice_revision);
+    const attempt = await bumpNoticeRevision(db, id, seenRevision);
     if (!attempt.ok) {
       return fail(
         attempt.reason === 'race'

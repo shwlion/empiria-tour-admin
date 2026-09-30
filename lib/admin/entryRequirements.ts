@@ -404,16 +404,14 @@ export async function noticeTemplateReady(): Promise<boolean | null> {
   return Boolean(data && data.is_active && data.subject.trim() && data.body_html.trim());
 }
 
-export type OwedNotices = { requirementId: string; label: string; due: number; failed: number; unshown: number; uncovered: number };
+export type OwedNotices = { requirementId: string; label: string; due: number; failed: number };
 
 /**
- * For each active row, the bookings not yet told:
- * `due` has no message yet, `failed` failed to send, and `unshown` is queued
- * but not sent, so the traveller has not seen it. `uncovered` counts bookings
- * never shown this row's current wording that no notice will reach: brought
- * into scope by a destination, country or row change, or by a "correction"
- * on a new row (spec §7, "bookings brought into scope"). Rows with none are
- * left out.
+ * For each active row, the notices owed: `due` bookings have no message yet
+ * and `failed` ones failed to send. A queued notice is on its way and is not
+ * owed. Bookings never shown the current wording that no notice will reach
+ * were left out on purpose (a correction makes no one due, spec §6), so they
+ * are not owed either. Rows with none are left out.
  */
 export async function listOwedNotices(rows: EntryRequirementRecord[]): Promise<{ owed: OwedNotices[]; error: string | null }> {
   const told = rows.filter((r) => r.status === 'active');
@@ -422,17 +420,58 @@ export async function listOwedNotices(rows: EntryRequirementRecord[]): Promise<{
   for (let i = 0; i < told.length; i++) {
     const { rows: booked, messages, error } = results[i];
     if (error) return { owed: [], error };
-    const count = { due: 0, failed: 0, unshown: 0, uncovered: 0 };
+    const count = { due: 0, failed: 0 };
     for (const b of booked) {
       const status = noticeStatus(b, b.noticeKey ? messages[b.noticeKey] : undefined);
       if (status === 'due') count.due++;
       else if (status === 'failed') count.failed++;
-      else if (status === 'queued') count.unshown++;
-      if (!b.sawCurrent && !b.noticeDue) count.uncovered++;
     }
-    if (count.due + count.failed + count.unshown + count.uncovered > 0) {
+    if (count.due + count.failed > 0) {
       owed.push({ requirementId: told[i].id, label: pairLabel(told[i].destinationCountry, told[i].passportCountry), ...count });
     }
   }
   return { owed, error: null };
+}
+
+/**
+ * What a save does with the answer to the s.37 question: the answer counts
+ * only when the question was asked. An answer to a question that was not
+ * asked (a second tab repeating an edit already saved, a stale form) is
+ * ignored, so it can never record a second notice. Asked and unanswered is
+ * null too; the save refuses that before it gets here. Pure, and asserted in
+ * `entryRequirements.test.ts`.
+ */
+export function noticeDecision(input: { asked: boolean; notice: string }): 'tell' | 'correction' | null {
+  if (!input.asked) return null;
+  return input.notice === 'tell' || input.notice === 'correction' ? input.notice : null;
+}
+
+/**
+ * Whether the card offers "Send the current wording…": some booking holds
+ * older wording, and the current wording has not been the subject of a "tell"
+ * since it last changed (or no tell was ever recorded, or a booking has no
+ * notice coming). `older` and `uncovered` are counts of bookings. Timestamps
+ * are compared as instants. Pure, and asserted in `entryRequirements.test.ts`.
+ */
+export function offerSendCurrent(input: {
+  older: number;
+  uncovered: number;
+  noticeRevision: number;
+  contentChangedAt: string | null;
+  noticeRevisedAt: string | null;
+}): boolean {
+  if (input.older <= 0) return false;
+  if (input.uncovered > 0 || input.noticeRevision === 0) return true;
+  if (input.contentChangedAt === null) return false;
+  return input.noticeRevisedAt === null || Date.parse(input.contentChangedAt) > Date.parse(input.noticeRevisedAt);
+}
+
+/**
+ * The dedupe keys of notices that can be released for retry: those the outbox
+ * says `failed`. A `cancelled` message reads as failed on the card but the
+ * retry cannot release it (the update matches `status = 'failed'`), so the
+ * button and the action both count only these.
+ */
+export function failedNoticeKeys(rows: BookedTraveller[], messages: Record<string, string>): string[] {
+  return rows.map((r) => r.noticeKey).filter((k): k is string => k !== null && messages[k] === 'failed');
 }

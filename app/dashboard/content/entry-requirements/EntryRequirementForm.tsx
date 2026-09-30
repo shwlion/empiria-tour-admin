@@ -6,6 +6,7 @@ import { Archive } from 'lucide-react';
 import { Banner, Button, Card, Checkbox, Field, Input, Select, SubmitButton, Textarea } from '@/components/ui';
 import type { ActionResult } from '@/lib/actions';
 import { COUNTRIES, countryName, isCountryCode } from '@/lib/countries';
+import { formatDepartureDate } from '@/lib/money';
 import {
   ENTRY_COPY,
   REQUIREMENT_CAPTIONS,
@@ -150,7 +151,7 @@ export default function EntryRequirementForm({
             <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
               {retired.data?.affected.map((a) => (
                 <li key={a.reference}>
-                  {a.reference} — {a.leadName}, {a.leadEmail}, departs {a.startsOn}
+                  {a.reference} — {a.leadName}, {a.leadEmail}, departs {formatDepartureDate(a.startsOn)}
                 </li>
               ))}
             </ul>
@@ -390,7 +391,7 @@ export default function EntryRequirementForm({
             variant="danger"
             disabled={retiring}
             onClick={() => {
-              if (!window.confirm('Retire this row? Travellers on this passport see the other-passport text instead. Nobody already booked is told; the Booked travellers card lists who to contact.')) return;
+              if (!window.confirm('Retire this row? Travellers on this passport see the other-passport text instead. Retiring tells nobody by itself; the Booked travellers card lists who to contact.')) return;
               setRetired(null);
               startRetire(async () => {
                 const result = await retireEntryRequirementAction(record.id);

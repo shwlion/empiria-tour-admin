@@ -2,8 +2,11 @@ import { explain } from '@/lib/actions';
 import {
   contentChanged,
   isHttpsAddress,
+  failedNoticeKeys,
+  noticeDecision,
   noticeDecisionNeeded,
   noticeStatus,
+  offerSendCurrent,
   pairLabel,
   parseApplyDaysBefore,
   validateEntryRequirement,
@@ -156,6 +159,35 @@ eq('the outbox says sent: sent', noticeStatus(dueRow, 'sent'), 'sent');
 eq('the outbox says failed: failed', noticeStatus(dueRow, 'failed'), 'failed');
 eq('a cancelled message still means not told: failed', noticeStatus(dueRow, 'cancelled'), 'failed');
 eq('the message outranks the due flag', noticeStatus(booked({ noticeDue: false, noticeKey: 'k' }), 'sent'), 'sent');
+
+// ── an answer counts only to a question that was asked ──────────────────────
+eq('an unasked tell is ignored', noticeDecision({ asked: false, notice: 'tell' }), null);
+eq('an unasked correction is ignored', noticeDecision({ asked: false, notice: 'correction' }), null);
+eq('asked and tell: tell', noticeDecision({ asked: true, notice: 'tell' }), 'tell');
+eq('asked and correction: correction', noticeDecision({ asked: true, notice: 'correction' }), 'correction');
+eq('asked and unanswered: no decision, the save refuses', noticeDecision({ asked: true, notice: '' }), null);
+
+// ── when the card offers "Send the current wording" ─────────────────────────
+const offer = (o: Partial<Parameters<typeof offerSendCurrent>[0]> = {}) =>
+  offerSendCurrent({
+    older: 2, uncovered: 0, noticeRevision: 1,
+    contentChangedAt: '2026-09-20T10:00:00Z', noticeRevisedAt: '2026-09-21T10:00:00Z', ...o,
+  });
+eq('nobody holds older wording: not offered', offer({ older: 0, uncovered: 2 }), false);
+eq('someone holds older wording with no notice coming: offered', offer({ uncovered: 1 }), true);
+eq('everyone due under the last tell and wording unchanged since: not offered', offer(), false);
+eq('all due under revision 1 but the wording changed after the stamp: offered', offer({ contentChangedAt: '2026-09-25T10:00:00Z' }), true);
+eq('revision 0 with older bookings: offered', offer({ noticeRevision: 0, noticeRevisedAt: null }), true);
+eq('a revision with no stamp and changed wording: offered', offer({ noticeRevisedAt: null }), true);
+eq('a revision, wording never changed: not offered', offer({ contentChangedAt: null }), false);
+
+// ── retry: one test for "failed", on the card and in the action ─────────────
+const keyed = (k: string) => booked({ bookingId: k, noticeKey: k, noticeDue: true });
+eq(
+  'only failed messages are released; cancelled cannot be',
+  failedNoticeKeys([keyed('a'), keyed('b'), keyed('c'), booked()], { a: 'failed', b: 'cancelled', c: 'sent' }),
+  ['a']
+);
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
 process.exit(failed === 0 ? 0 : 1);

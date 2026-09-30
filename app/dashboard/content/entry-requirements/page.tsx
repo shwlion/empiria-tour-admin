@@ -18,15 +18,15 @@ export const metadata: Metadata = { title: 'Entry requirements · Empiria Tour A
 
 const PATH = '/dashboard/content/entry-requirements';
 
+/** "2 due · 1 failed": the notices owed, those not yet queued and those that failed. */
+const owedText = (o: OwedNotices) => [o.due && `${o.due} due`, o.failed && `${o.failed} failed`].filter(Boolean).join(' · ');
+
 /**
  * Entry requirements (0036), grouped by destination country: every country a
  * destination is coded with, plus any a row names. Canada's passport comes
  * first in each group, because it is TICO's online minimum and what anyone
  * without a profile country is shown.
  */
-/** "2 due · 1 failed": the notices of the current revision nobody has seen yet. */
-const owedText = (o: OwedNotices) =>
-  [o.due && `${o.due} due`, o.failed && `${o.failed} failed`, o.unshown && `${o.unshown} queued`, o.uncovered && `${o.uncovered} never shown`].filter(Boolean).join(' · ');
 /** Canada first, then by the passport country's name. */
 const byPassport = (a: EntryRequirementRecord, b: EntryRequirementRecord) =>
   Number(b.passportCountry === 'CA') - Number(a.passportCountry === 'CA') ||

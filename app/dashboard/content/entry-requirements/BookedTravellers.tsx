@@ -9,7 +9,9 @@ import { formatDepartureDate } from '@/lib/money';
 import { countryName } from '@/lib/countries';
 import {
   CHANGE_TEMPLATE,
+  failedNoticeKeys,
   noticeStatus,
+  offerSendCurrent,
   type BookedTraveller,
   type EntryRequirementRecord,
 } from '@/lib/admin/entryRequirements';
@@ -45,7 +47,15 @@ export default function BookedTravellers({
   const older = rows.filter((r) => !r.sawCurrent).length;
   // …of whom some have no notice coming under the current revision.
   const uncovered = rows.filter((r) => !r.sawCurrent && !r.noticeDue).length;
-  const failed = statuses.filter((s) => s === 'failed').length;
+  // The same test the retry action uses, so the button and the action agree.
+  const failed = failedNoticeKeys(rows, messages).length;
+  const offerSend = offerSendCurrent({
+    older,
+    uncovered,
+    noticeRevision: record.noticeRevision,
+    contentChangedAt: record.contentChangedAt,
+    noticeRevisedAt: record.noticeRevisedAt,
+  });
   const destination = countryName(record.destinationCountry) ?? record.destinationCountry;
   const passport = countryName(record.passportCountry) ?? record.passportCountry;
 
@@ -103,9 +113,9 @@ export default function BookedTravellers({
         </Table>
       )}
 
-      {!error && record.status === 'active' && (uncovered > 0 || failed > 0) && (
+      {!error && record.status === 'active' && (offerSend || failed > 0) && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {uncovered > 0 && (
+          {offerSend && (
             <Button
               type="button"
               disabled={pending}

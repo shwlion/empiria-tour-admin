@@ -12,8 +12,10 @@ import {
   contentChanged,
   countCommittedUpcoming,
   listBookedTravellers,
+  noticeDecision,
   noticeDecisionNeeded,
   noticeTemplateReady,
+  failedNoticeKeys,
   pairLabel,
   validateEntryRequirement,
 } from '@/lib/admin/entryRequirements';
@@ -47,7 +49,8 @@ type BeforeRow = {
 /**
  * Record a "tell them" decision: bump `notice_revision` from the value read at
  * the start, and only from that value — if someone else recorded one in
- * between, nothing is written and this returns null. It sends no date: the
+ * between, nothing is written and this says `race` (a failed write says
+ * `write`). It sends no date: the
  * database stamps `notice_revised_at`, the line between who is due and who is
  * not, when the revision changes, and it is read back here.
  */
@@ -55,7 +58,7 @@ async function bumpNoticeRevision(
   db: Db,
   id: string,
   from: number,
-): Promise<{ revision: number; revisedAt: string | null } | null> {
+): Promise<{ ok: true; revision: number; revisedAt: string | null } | { ok: false; reason: 'race' | 'write' }> {
   const { data, error } = await db
     .from('entry_requirements')
     .update({ notice_revision: from + 1 })
@@ -64,9 +67,11 @@ async function bumpNoticeRevision(
     .select('notice_revision, notice_revised_at');
   if (error) {
     console.error('[entry-requirements] notice not recorded', error);
-    return null;
+    return { ok: false, reason: 'write' };
   }
-  return data && data.length === 1 ? { revision: data[0].notice_revision, revisedAt: data[0].notice_revised_at } : null;
+  return data && data.length === 1
+    ? { ok: true, revision: data[0].notice_revision, revisedAt: data[0].notice_revised_at }
+    : { ok: false, reason: 'race' };
 }
 
 /** How many bookings are now due a notice, for the result line; null when it could not be read. */
@@ -156,8 +161,9 @@ export async function saveEntryRequirementAction(
     if (asked && notice !== 'tell' && notice !== 'correction') {
       return fail('Choose whether to tell the travellers already booked.', { notice: 'Choose one' });
     }
-    const decision: 'tell' | 'correction' | null =
-      notice === 'tell' && v.status === 'active' ? 'tell' : asked ? 'correction' : null;
+    // An answer to a question that was not asked is ignored: a repeat save
+    // from a stale tab must not record a second notice.
+    const decision = noticeDecision({ asked, notice });
 
     // An explicit column list: nothing the form did not mean to write, and
     // never the version or notice fields, which the trigger and the notice
@@ -199,7 +205,8 @@ export async function saveEntryRequirementAction(
     // wording, including one made while the save was in flight, accepted it
     // before the stamp.
     const from = before?.notice_revision ?? 0;
-    const bumped = decision === 'tell' ? await bumpNoticeRevision(db, savedId, from) : null;
+    const attempt = decision === 'tell' ? await bumpNoticeRevision(db, savedId, from) : null;
+    const bumped = attempt?.ok ? attempt : null;
     const revision = bumped?.revision ?? null;
     const decided =
       decision === 'correction'
@@ -309,7 +316,7 @@ export async function retireEntryRequirementAction(id: string): Promise<ActionRe
       summary:
         affected.length === 0
           ? `Retired ${label}. No upcoming booking was advised under it.`
-          : `Retired ${label}. ${affected.length} booked ${affected.length === 1 ? 'traveller was' : 'travellers were'} not notified: ${affected.map((a) => a.reference).join(', ')}.`,
+          : `Retired ${label}. ${affected.length} booked ${affected.length === 1 ? 'traveller was' : 'travellers were'} not notified by the retire: ${affected.map((a) => a.reference).join(', ')}.`,
     });
 
     revalidatePath(PATH);
@@ -319,7 +326,7 @@ export async function retireEntryRequirementAction(id: string): Promise<ActionRe
       { affected },
       affected.length === 0
         ? `${label} is retired. No upcoming booking was advised under it.`
-        : `${label} is retired. Nobody is told automatically — contact ${affected.length === 1 ? 'this booking' : `these ${affected.length} bookings`} by hand:`
+        : `${label} is retired. Retiring tells nobody by itself; notices already due from an earlier “Tell them” still go out once the change email is on. To reach ${affected.length === 1 ? 'this booking' : `these ${affected.length} bookings`} now, contact them by hand:`
     );
   } catch (e) {
     return fail(explain(e));
@@ -351,8 +358,15 @@ export async function notifyEntryRequirementAction(id: string): Promise<ActionRe
       return fail('Every booked traveller was advised under the current wording. There is nothing to send.');
     }
 
-    const bumped = await bumpNoticeRevision(db, id, row.notice_revision);
-    if (bumped === null) return fail('Someone else recorded a notice on this row a moment ago. Reload to see it.');
+    const attempt = await bumpNoticeRevision(db, id, row.notice_revision);
+    if (!attempt.ok) {
+      return fail(
+        attempt.reason === 'race'
+          ? 'Someone else recorded a notice on this row a moment ago. Reload to see it.'
+          : 'The notice could not be recorded. Try again in a moment.'
+      );
+    }
+    const bumped = attempt;
 
     const label = pairLabel(row.destination_country, row.passport_country);
     await recordAudit(db, user, {
@@ -396,9 +410,7 @@ export async function retryFailedNoticesAction(id: string): Promise<ActionResult
 
     const booked = await listBookedTravellers(id);
     if (booked.error) return fail(`The booked travellers could not be read: ${booked.error}`);
-    const keys = booked.rows
-      .map((r) => r.noticeKey)
-      .filter((k): k is string => k !== null && booked.messages[k] === 'failed');
+    const keys = failedNoticeKeys(booked.rows, booked.messages);
     if (keys.length === 0) return fail('No notice of the current wording has failed.');
 
     let released = 0;

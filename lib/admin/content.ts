@@ -164,15 +164,20 @@ export async function getDisclosureBlock(id: string): Promise<DisclosureBlock | 
  * written down before there is code depending on it, rather than discovered
  * from whatever the first sender happened to pass. The editor shows the list
  * beside the body so nobody has to guess a name and find out by sending.
+ *
+ * It mirrors TEMPLATE_FIELDS in the storefront's `lib/email/fields.ts`, by
+ * hand. A new field goes live there first and is offered here second: offered
+ * before the live renderer knows it, a field saves, then fails every message
+ * that uses it at send. The entry-requirements fields (0036) arrived that way.
  */
 const COMMON_FIELDS = ['company.name', 'company.registration_number', 'company.contact_email'];
 
 export const MERGE_FIELDS: Record<string, string[]> = {
-  booking_confirmed: ['booking.reference', 'booking.total', 'traveller.name', 'package.title', 'departure.date', 'departure.meeting_point', 'booking.travellers'],
+  booking_confirmed: ['booking.reference', 'booking.total', 'traveller.name', 'package.title', 'departure.date', 'departure.meeting_point', 'booking.travellers', 'booking.link', 'booking.entry_requirements', 'booking.traveller_names'],
   deposit_taken: ['booking.reference', 'payment.amount', 'booking.balance', 'booking.balance_due_on', 'traveller.name', 'package.title', 'departure.date'],
   balance_due: ['booking.reference', 'booking.balance', 'booking.balance_due_on', 'traveller.name', 'package.title', 'departure.date', 'payment.link'],
   balance_paid: ['booking.reference', 'payment.amount', 'booking.total', 'traveller.name', 'package.title', 'departure.date'],
-  pre_departure: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'departure.meeting_point', 'departure.start_time', 'package.what_to_bring'],
+  pre_departure: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'departure.meeting_point', 'departure.start_time', 'package.what_to_bring', 'booking.link', 'booking.entry_requirements', 'booking.traveller_names'],
   booking_cancelled: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'booking.refund_due'],
   booking_amended: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'booking.changes'],
   departure_change: ['booking.reference', 'traveller.name', 'package.title', 'departure.old_date', 'departure.date', 'departure.reason'],
@@ -185,6 +190,8 @@ export const MERGE_FIELDS: Record<string, string[]> = {
   partner_application_approved: ['applicant.name', 'applicant.company', 'partner.console_link'],
   partner_application_declined: ['applicant.name', 'applicant.company', 'application.note'],
   partner_application_alert: ['applicant.name', 'applicant.company', 'application.admin_link'],
+  entry_requirements_reminder: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'booking.link', 'booking.entry_requirements', 'booking.traveller_names', 'entry.destination', 'entry.passport', 'entry.apply_link', 'entry.headline', 'entry.apply_by'],
+  entry_requirements_changed: ['booking.reference', 'traveller.name', 'package.title', 'departure.date', 'booking.link', 'booking.entry_requirements', 'booking.traveller_names', 'entry.destination', 'entry.passport', 'entry.apply_link', 'entry.headline', 'entry.apply_by'],
 };
 
 /** When each one is sent, in the words of somebody deciding what it should say. */
@@ -193,7 +200,7 @@ export const TEMPLATE_TRIGGERS: Record<string, string> = {
   deposit_taken: 'A deposit clears and a balance remains outstanding.',
   balance_due: 'Ahead of the balance due date on a part-paid booking.',
   balance_paid: 'The balance clears and nothing further is owed.',
-  pre_departure: 'Shortly before departure, with the practical details.',
+  pre_departure: 'Shortly before departure, with the practical details. Offers {{booking.entry_requirements}} for late bookings.',
   booking_cancelled: 'A booking is cancelled, by the traveller or by Empiria.',
   booking_amended: 'Staff change something on an existing booking.',
   departure_change: 'A departure is rescheduled or its details change.',

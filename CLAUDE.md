@@ -204,13 +204,28 @@ Under Content → Entry requirements. There is one row per destination country
   "Tell them" still go out once the change template is on.
 - "Owed" notices, on the list and the dashboard's content overview, are due
   (not yet queued) plus failed. A queued notice is on its way.
-- The Booked travellers card is the manual channel while mail is off.
+- The Booked travellers card is the manual channel while mail is off. Its
+  "Send the current wording…" is keyed on the `notice_revision` the card was
+  loaded with, so a second click from a stale tab is refused, not recorded.
 - The country select on destinations and the Settings "Entry requirements"
   card feed the same advice.
 
 `lib/countries.ts` and `lib/entryAdvice.ts` are byte-identical copies of the
 storefront's. Change them there and copy them here. The storefront's
 `scripts/check-mirrors.mjs` fails when they differ.
+
+**Deploy order** (the storefront's `docs/PROJECT.md` has the whole list):
+- This branch merges in two steps. First through `28247c4` (Tasks 9–12),
+  which ship together. Everything after it (Task 18's `MERGE_FIELDS` in
+  `lib/admin/content.ts`, the docs and the final review's fixes) only once
+  storefront Task 17 is live. Before then, `booking_confirmed` or
+  `pre_departure` edited to use the new fields would save, then fail at
+  send with its one-shot key spent.
+- **Before storefront Tasks 15–16 go live, every destination Empiria sells
+  is coded with its country** under Content → Destinations. A booking
+  recorded as `no_country` is never queued a reminder or a change notice
+  and never appears on a Booked travellers card (0036's SQL), even though
+  its storefront page and emails pick up the advice once its tour is coded.
 
 ## Not built
 

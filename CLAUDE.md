@@ -171,6 +171,46 @@ closing note (`platform_settings.receipt_*`, 0018). The storefront renders
 them around the receipt's immutable facts; legal wording still goes through
 disclosure blocks placed on the receipt.
 
+## Entry requirements (0036)
+
+Under Content → Entry requirements. There is one row per destination country
+× passport country, and every word in it is Empiria's.
+- The pair is fixed once a row exists: the trigger refuses to change the
+  destination or the passport, and the form's selects are disabled on edit.
+  To change one, retire the row and add another. Nothing deletes a row.
+- `content_version` is bumped by a database trigger,
+  `entry_requirements_version`, whenever one of the eight advice columns
+  changes: `requirement`, `headline`, `before_arrival`, `why`,
+  `processing_time`, `apply_days_before`, `apply_url` and `official_url`.
+  `contentChanged` compares the same eight, so the form and the database
+  agree on what counts as a change.
+- v2's two fields: the headline, one line of at most 160 characters, and
+  "Apply at least … days before departure", a whole number from 1 to 365.
+  Blank saves null; so does a headline of only whitespace or invisible
+  characters. Line and paragraph separators (U+2028, U+2029) and U+0085 are
+  refused. The requirement select's hint says which colour the alert takes
+  (amber strong text is `#b54708`), and the preview draws the row as the
+  tour page's alert, with no date.
+- An active row with no headline is an owed-content gap.
+- Saving a changed, active row while committed upcoming bookings exist asks
+  one question with no default: "Tell them" or "correction". "Tell them"
+  bumps `notice_revision` in a statement of its own, after the save has
+  committed, and is audited as `notify`. It sends no date: the database
+  stamps `notice_revised_at` with `clock_timestamp()` in the version trigger
+  whenever the revision changes, and the action reads the stamp back.
+- Retiring never asks and tells nobody by itself. It lists the bookings that
+  lose the advice, for contact by hand. Notices already due from an earlier
+  "Tell them" still go out once the change template is on.
+- "Owed" notices, on the list and the dashboard's content overview, are due (not yet queued) plus
+  failed. A queued notice is on its way.
+- The Booked travellers card is the manual channel while mail is off.
+- The country select on destinations and the Settings "Entry requirements"
+  card feed the same advice.
+
+`lib/countries.ts` and `lib/entryAdvice.ts` are byte-identical copies of the
+storefront's. Change them there and copy them here. The storefront's
+`scripts/check-mirrors.mjs` fails when they differ.
+
 ## Not built
 
 B3's tail — refunds, cancellation, amending a booking with recalculation,
